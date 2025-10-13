@@ -1,0 +1,528 @@
+# Product Requirements Document (PRD)
+
+**Project Name:** Startup Prediction Markets (Hackathon Demo)  
+**Platform:** Polygon Testnet  
+**Prepared For:** Replit Agent  
+**Version:** 2.1
+
+---
+
+## 1. Overview
+
+This project is a prediction markets application where users bet on whether startups will reach $1M ARR. The hackathon demo focuses on core betting mechanics, wallet integration, and basic admin controls.
+
+**Two Dashboards:**
+1. **User Dashboard** — Open to anyone with a wallet
+2. **Admin Dashboard** — Restricted to authorized admin wallet addresses
+
+**Key Simplification:** Fixed bet amounts, manual resolution, single-page app architecture.
+
+---
+
+## 2. Objectives
+
+- Deploy a working demo on Polygon testnet
+- Enable wallet-only access (no email/password)
+- Enforce one bet per wallet per event
+- Display live countdown timers on each event
+- Show win/loss results and payouts after resolution
+- Provide admin controls for event management
+- Store structured data for future VC analysis
+
+---
+
+## 3. User Flows
+
+### User Dashboard Flow
+
+1. User visits webapp
+2. Clicks "Connect Wallet" (MetaMask)
+3. Sees list of startup betting events with:
+   - Startup name and description
+   - Current bet totals (YES: X bets, NO: Y bets)
+   - Countdown timer until betting closes
+   - Event status badge (Open/Closed/Resolved)
+4. Clicks on an event to view details
+5. Selects YES or NO and clicks "Place Bet"
+6. Confirms transaction in MetaMask (10 test MATIC)
+7. Sees confirmation message: "Bet placed successfully"
+8. After event resolves, sees result: "You won! Claim X MATIC" or "You lost"
+9. Can view "My Bets" page showing all past bets
+
+### Admin Dashboard Flow
+
+1. Admin connects wallet (must be whitelisted address)
+2. Sees additional "Admin" tab in navigation
+3. **Create Event:**
+   - Fills form: Startup Name, Description, Betting End Time
+   - Clicks "Create Event"
+   - Event appears immediately in user dashboard
+4. **Monitor Events:**
+   - Views table of all events with bet statistics
+   - Sees countdown timers and total pools
+5. **Resolve Event:**
+   - After countdown expires, clicks "Resolve" button
+   - Selects outcome: YES or NO
+   - Confirms transaction
+   - Users can now claim payouts
+
+---
+
+## 4. Features & Scope
+
+### 4.1 Core Features (Must Have)
+
+- **Wallet Connection:** MetaMask only (simplest for hackathon)
+- **Fixed Bet Size:** Every single bet is exactly 10 test MATIC (hardcoded in smart contract, non-negotiable)
+- **One Bet Per Wallet:** Enforced on-chain via mapping
+- **Countdown Timers:** Display time remaining until betting closes
+- **Manual Resolution:** Admin clicks button to set outcome
+- **Payout Claims:** Users manually claim winnings after resolution
+
+**IMPORTANT: All bets have identical value (10 MATIC). Users cannot choose custom amounts. This is a core simplification for the demo.**
+
+### 4.2 User Dashboard Features
+
+- Browse all events (sorted by newest first)
+- Filter by status: Open, Closed, Resolved
+- Place one bet per event (YES or NO) - always 10 MATIC
+- View personal betting history
+- Claim payouts for winning bets
+
+### 4.3 Admin Dashboard Features
+
+- Create new events (form with 3 fields)
+- View all events in table format
+- Resolve events after countdown expires
+- See basic statistics (total bets, pool sizes)
+
+### 4.4 Non-Goals (Explicitly Out of Scope)
+
+- Variable bet amounts (all bets are 10 MATIC)
+- Automated oracles
+- Liquidity pools or AMM mechanics
+- Mobile app
+- User profiles or social features
+- Fiat on-ramps
+- Governance tokens
+- Gas optimization beyond basics
+- Advanced analytics dashboard
+
+---
+
+## 5. Technical Architecture
+
+### 5.1 Smart Contract Specification
+
+**Single Contract:** `PredictionMarket.sol`
+
+**Key State Variables:**
+```solidity
+uint256 public constant BET_AMOUNT = 10 ether; // FIXED: Every bet is exactly 10 test MATIC
+address public admin;
+uint256 public eventCounter;
+
+struct Event {
+    string name;
+    string description;
+    uint256 bettingEndTime;
+    uint256 totalYesBets;
+    uint256 totalNoBets;
+    bool isResolved;
+    bool outcome; // true = YES wins, false = NO wins
+}
+
+mapping(uint256 => Event) public events;
+mapping(uint256 => mapping(address => bool)) public hasUserBet;
+mapping(uint256 => mapping(address => bool)) public userBetChoice; // true = YES, false = NO
+```
+
+**Core Functions:**
+```solidity
+function createEvent(string memory name, string memory description, uint256 bettingEndTime) external onlyAdmin
+
+function placeBet(uint256 eventId, bool betYes) external payable
+// Requirements:
+// - msg.value == BET_AMOUNT (must be exactly 10 MATIC)
+// - block.timestamp < event.bettingEndTime
+// - hasUserBet[eventId][msg.sender] == false
+
+function resolveEvent(uint256 eventId, bool outcome) external onlyAdmin
+// Requirements:
+// - block.timestamp >= event.bettingEndTime
+// - event.isResolved == false
+
+function claimPayout(uint256 eventId) external
+// Requirements:
+// - event.isResolved == true
+// - user bet on winning side
+// - user hasn't claimed yet
+```
+
+**Payout Logic (Parimutuel System):**
+
+Since all bets are identical (10 MATIC each), the calculation simplifies:
+
+$$\text{Winner's Payout} = 10 + \left(\frac{10}{\text{Total Winning Side Pool}}\right) \times \text{Total Losing Side Pool}$$
+
+**Example:**
+- 7 users bet YES (70 MATIC total, each bet 10 MATIC)
+- 3 users bet NO (30 MATIC total, each bet 10 MATIC)
+- YES wins
+- Each YES bettor receives: 10 + (10/70) × 30 = 14.29 MATIC
+
+**Edge Case Handling:**
+- If everyone bets the same side and that side wins: users get their 10 MATIC back
+- If everyone bets the same side and that side loses: funds locked (admin can create refund function post-hackathon)
+
+### 5.2 Frontend Stack
+
+**Framework:** React (Vite template)  
+**Wallet Integration:** RainbowKit + Wagmi  
+**Blockchain Interaction:** Ethers.js v6  
+**Styling:** Tailwind CSS  
+**State Management:** React Context (simple for demo)
+
+**Key Components:**
+```
+src/
+├── components/
+│   ├── ConnectWallet.jsx
+│   ├── EventCard.jsx
+│   ├── EventList.jsx
+│   ├── BetModal.jsx
+│   ├── AdminPanel.jsx
+│   └── CountdownTimer.jsx
+├── pages/
+│   ├── HomePage.jsx
+│   ├── MyBetsPage.jsx
+│   └── AdminPage.jsx
+├── contracts/
+│   └── PredictionMarket.json (ABI)
+└── App.jsx
+```
+
+### 5.3 Backend & Database
+
+**Database:** PostgreSQL (via Replit's built-in database)
+
+**Schema:**
+```sql
+-- Events table (mirrors on-chain data for faster queries)
+CREATE TABLE events (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    betting_end_time TIMESTAMP NOT NULL,
+    total_yes_bets INTEGER DEFAULT 0,
+    total_no_bets INTEGER DEFAULT 0,
+    is_resolved BOOLEAN DEFAULT FALSE,
+    outcome BOOLEAN,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Bets table (for analytics)
+CREATE TABLE bets (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER REFERENCES events(id),
+    wallet_address TEXT NOT NULL,
+    bet_choice BOOLEAN NOT NULL, -- true = YES, false = NO
+    bet_amount NUMERIC NOT NULL DEFAULT 10, -- Always 10 MATIC
+    timestamp TIMESTAMP DEFAULT NOW(),
+    has_claimed BOOLEAN DEFAULT FALSE
+);
+
+-- Index for fast lookups
+CREATE INDEX idx_wallet_bets ON bets(wallet_address);
+CREATE INDEX idx_event_bets ON bets(event_id);
+```
+
+**API Endpoints (Express.js):**
+```
+GET  /api/events                    // List all events
+GET  /api/events/:id                // Get event details
+POST /api/events                    // Create event (admin only)
+GET  /api/events/:id/bets           // Get bet statistics
+GET  /api/bets/:walletAddress       // Get user's bet history
+POST /api/admin/export              // Export data as CSV
+```
+
+### 5.4 Environment Variables
+
+```bash
+# .env file
+ADMIN_WALLET_ADDRESS=0x...          # Hardcoded admin address
+POLYGON_RPC_URL=https://rpc-mumbai.maticvigil.com/
+CONTRACT_ADDRESS=0x...              # Deployed contract address
+DATABASE_URL=postgresql://...       # Replit provides this
+PRIVATE_KEY=0x...                   # For backend contract interactions (optional)
+```
+
+---
+
+## 6. Event Lifecycle & State Machine
+
+**State Diagram:**
+```
+CREATED → OPEN → CLOSED → RESOLVED → CLAIMABLE
+```
+
+**State Definitions:**
+- **CREATED:** Event exists but betting hasn't started (not implemented in v1)
+- **OPEN:** Current time < bettingEndTime, users can place bets
+- **CLOSED:** Current time >= bettingEndTime, betting locked, awaiting resolution
+- **RESOLVED:** Admin has set outcome (YES or NO)
+- **CLAIMABLE:** Users can claim payouts (same as RESOLVED for simplicity)
+
+**Transition Rules:**
+- OPEN → CLOSED: Automatic when countdown reaches zero (frontend enforces, smart contract validates)
+- CLOSED → RESOLVED: Manual admin action only
+- Admin can resolve immediately after creation (for testing), but UI should warn
+
+---
+
+## 7. UI/UX Specifications
+
+### 7.1 User Dashboard Layout
+
+**Header:**
+- Logo/App Name (left)
+- "Connect Wallet" button (right)
+- Navigation: Home | My Bets | [Admin] (if admin wallet)
+
+**Event Card Design:**
+```
+┌─────────────────────────────────────┐
+│ 🚀 Startup Name                     │
+│ Brief description...                │
+│                                     │
+│ ⏰ Closes in: 2d 14h 32m           │
+│                                     │
+│ YES: 45 bets (450 MATIC)           │
+│ NO:  23 bets (230 MATIC)           │
+│                                     │
+│ [Status Badge: OPEN/CLOSED/RESOLVED]│
+│ [Place Bet Button]                  │
+└─────────────────────────────────────┘
+```
+
+**Bet Modal:**
+```
+┌─────────────────────────────────────┐
+│     Place Your Bet                  │
+│                                     │
+│  Will [Startup] reach $1M ARR?     │
+│                                     │
+│  [ YES ]    [ NO ]                 │
+│                                     │
+│  Bet Amount: 10 MATIC (fixed)      │
+│  Potential Return: ~14.3 MATIC     │
+│                                     │
+│  [Cancel]  [Confirm Bet]           │
+└─────────────────────────────────────┘
+```
+
+**UI Note:** The bet amount field should NOT be editable. Display "10 MATIC (fixed)" as static text to make it crystal clear users cannot change this value.
+
+### 7.2 Admin Dashboard Layout
+
+**Event Creation Form:**
+```
+Startup Name:     [__________________]
+Description:      [__________________]
+                  [__________________]
+Betting End Time: [Date Picker] [Time Picker]
+
+[Create Event]
+```
+
+**Event Management Table:**
+```
+| ID | Name      | Status   | YES/NO | End Time | Actions     |
+|----|-----------|----------|--------|----------|-------------|
+| 1  | Startup A | CLOSED   | 45/23  | 2h ago   | [Resolve]   |
+| 2  | Startup B | OPEN     | 12/8   | in 3d    | [View]      |
+```
+
+---
+
+## 8. Data Export Format
+
+**CSV Export Structure:**
+```csv
+event_id,event_name,wallet_address,bet_choice,bet_amount,timestamp,outcome,payout,has_claimed
+1,Startup A,0x123...,YES,10,2025-10-10T14:30:00Z,YES,14.29,true
+1,Startup A,0x456...,NO,10,2025-10-10T15:45:00Z,YES,0,false
+```
+
+**JSON Export Structure:**
+```json
+{
+  "export_date": "2025-10-13T10:00:00Z",
+  "total_events": 5,
+  "total_bets": 234,
+  "events": [
+    {
+      "id": 1,
+      "name": "Startup A",
+      "total_pool": 680,
+      "yes_bets": 45,
+      "no_bets": 23,
+      "outcome": "YES",
+      "bets": [
+        {
+          "wallet": "0x123...",
+          "choice": "YES",
+          "payout": 14.29
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 9. Success Criteria
+
+**Functional Requirements:**
+- [ ] User can connect MetaMask wallet
+- [ ] User can place exactly one bet per event (always 10 MATIC)
+- [ ] System rejects bets that aren't exactly 10 MATIC
+- [ ] Countdown timer updates every second
+- [ ] Betting disabled after countdown expires
+- [ ] Admin can create events with future end times
+- [ ] Admin can resolve events after countdown expires
+- [ ] Winning users can claim payouts
+- [ ] Payout calculations match formula
+- [ ] "My Bets" page shows accurate history
+
+**Technical Requirements:**
+- [ ] Smart contract deployed on Polygon Mumbai testnet
+- [ ] Frontend hosted on Replit
+- [ ] Database stores all events and bets
+- [ ] No console errors in browser
+- [ ] Transactions confirm within 30 seconds
+- [ ] CSV export downloads successfully
+
+---
+
+## 10. Testing Scenarios
+
+**Test Case 1: Basic Betting Flow**
+1. Connect wallet A
+2. Create event "Startup X" ending in 1 hour
+3. Place YES bet from wallet A (exactly 10 MATIC)
+4. Try to place second bet from wallet A → should fail
+5. Connect wallet B, place NO bet (exactly 10 MATIC)
+6. Wait for countdown to expire
+7. Resolve event as YES
+8. Wallet A claims payout → should receive 20 MATIC
+9. Wallet B tries to claim → should fail
+
+**Test Case 2: Edge Case - All Same Side**
+1. Create event
+2. 5 wallets all bet YES (each 10 MATIC)
+3. Resolve as YES
+4. Each wallet should receive exactly 10 MATIC back
+
+**Test Case 3: Admin Controls**
+1. Try to access /admin with non-admin wallet → should redirect
+2. Connect admin wallet → should see admin panel
+3. Create event with past end time → should warn but allow
+4. Try to resolve unfinished event → should show warning
+
+**Test Case 4: Fixed Bet Amount Enforcement**
+1. User tries to send 5 MATIC → transaction should revert
+2. User tries to send 15 MATIC → transaction should revert
+3. Only exactly 10 MATIC should be accepted
+
+---
+
+## 11. Development Phases
+
+**Phase 1: Smart Contract**
+- Write and test PredictionMarket.sol
+- Deploy to Mumbai testnet
+- Verify on PolygonScan
+
+**Phase 2: Frontend Basics**
+- Set up React + RainbowKit
+- Create EventList and EventCard components
+- Implement wallet connection
+
+**Phase 3: Betting Logic**
+- Build BetModal component
+- Integrate placeBet() function with fixed 10 MATIC amount
+- Add transaction feedback
+
+**Phase 4: Admin Panel**
+- Create event form
+- Implement resolve functionality
+- Add wallet gating
+
+**Phase 5: Polish & Testing**
+- Add countdown timers
+- Style with Tailwind
+- Test all user flows
+
+---
+
+## 12. Known Limitations
+
+- **Fixed bet size only:** All bets must be exactly 10 MATIC (no variable amounts)
+- **No gas estimation:** Users must have enough MATIC in wallet
+- **No loading states:** Transactions may feel slow without spinners
+- **No error recovery:** Failed transactions require page refresh
+- **Manual resolution:** Admin must actively resolve events
+- **No refunds:** If event is cancelled, funds are locked
+- **Single admin:** No multi-sig or admin rotation
+- **No event editing:** Once created, events cannot be modified
+
+---
+
+## 13. Post-Hackathon Roadmap
+
+**Phase 2 Features:**
+- Variable bet sizes with liquidity pools
+- Automated resolution via Chainlink oracles
+- Event categories and search
+- Social features (comments, following)
+- Gas optimization and batching
+
+**Phase 3 Features:**
+- Deploy to Polygon mainnet
+- VC analytics dashboard
+- Mobile app (React Native)
+- Governance token for platform decisions
+
+---
+
+## 14. Dependencies & Tech Stack Summary
+
+**Smart Contracts:**
+- Solidity ^0.8.20
+- Hardhat (development framework)
+- OpenZeppelin Contracts (Ownable, ReentrancyGuard)
+
+**Frontend:**
+- React 18
+- Vite
+- RainbowKit + Wagmi
+- Ethers.js v6
+- Tailwind CSS
+- date-fns (for countdown timers)
+
+**Backend:**
+- Node.js + Express
+- PostgreSQL
+- node-postgres (pg)
+
+**Deployment:**
+- Replit (hosting)
+- Polygon Mumbai Testnet
+- PolygonScan (contract verification)
+
+---
+
+**This PRD is now ready for Replit Agent. All bets are fixed at 10 MATIC with no user customization. The agent will build everything in one continuous session.**
