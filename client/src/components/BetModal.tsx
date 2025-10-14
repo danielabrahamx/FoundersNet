@@ -47,7 +47,7 @@ export default function BetModal({
 
         <div className="space-y-6">
           <div>
-            <p className="text-sm text-muted-foreground mb-1">Will this startup reach $1M ARR?</p>
+            <p className="text-sm text-muted-foreground mb-1">Will this startup raise Series A?</p>
             <p className="font-semibold" data-testid="text-modal-event-name">{eventName}</p>
           </div>
 

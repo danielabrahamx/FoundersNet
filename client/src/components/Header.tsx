@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import WalletButton from "./WalletButton";
+import WalletSwitcher from "./WalletSwitcher";
 import ThemeToggle from "./ThemeToggle";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,9 +10,10 @@ interface HeaderProps {
   isAdmin?: boolean;
   onConnectWallet: () => void;
   onDisconnectWallet: () => void;
+  onSwitchWallet?: (wallet: string) => void;
 }
 
-export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisconnectWallet }: HeaderProps) {
+export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisconnectWallet, onSwitchWallet }: HeaderProps) {
   const [location] = useLocation();
 
   const navItems = [
@@ -33,9 +35,9 @@ export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisc
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
                 <Link key={item.path} href={item.path}>
-                  <a
+                  <span
                     className={cn(
-                      "px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate",
+                      "px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate cursor-pointer",
                       location === item.path
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground hover:text-foreground"
@@ -43,7 +45,7 @@ export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisc
                     data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}
                   >
                     {item.label}
-                  </a>
+                  </span>
                 </Link>
               ))}
             </nav>
@@ -51,27 +53,34 @@ export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisc
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <WalletButton
-              address={walletAddress}
-              onConnect={onConnectWallet}
-              onDisconnect={onDisconnectWallet}
-            />
+            {walletAddress && onSwitchWallet ? (
+              <WalletSwitcher 
+                currentWallet={walletAddress}
+                onSelectWallet={onSwitchWallet}
+              />
+            ) : (
+              <WalletButton
+                address={walletAddress}
+                onConnect={onConnectWallet}
+                onDisconnect={onDisconnectWallet}
+              />
+            )}
           </div>
         </div>
 
         <nav className="md:hidden flex items-center gap-1 pb-3 overflow-x-auto">
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
-              <a
+              <span
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover-elevate whitespace-nowrap",
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover-elevate whitespace-nowrap cursor-pointer",
                   location === item.path
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {item.label}
-              </a>
+              </span>
             </Link>
           ))}
         </nav>

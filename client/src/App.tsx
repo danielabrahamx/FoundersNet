@@ -9,11 +9,14 @@ import HomePage from "@/pages/HomePage";
 import MyBetsPage from "@/pages/MyBetsPage";
 import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
+import { ADMIN_WALLET, VOTER_WALLETS } from "@/lib/wallets";
 
-function Router() {
+function Router({ walletAddress }: { walletAddress?: string }) {
   return (
     <Switch>
-      <Route path="/" component={HomePage} />
+      <Route path="/">
+        <HomePage walletAddress={walletAddress} />
+      </Route>
       <Route path="/my-bets" component={MyBetsPage} />
       <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
@@ -22,20 +25,23 @@ function Router() {
 }
 
 export default function App() {
-  //todo: remove mock functionality - replace with actual wallet connection
   const [walletAddress, setWalletAddress] = useState<string>();
-  //todo: remove mock functionality - replace with actual admin check
-  const isAdmin = walletAddress === "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb";
+  const isAdmin = walletAddress === ADMIN_WALLET;
 
   const handleConnectWallet = () => {
-    //todo: remove mock functionality - integrate MetaMask
-    setWalletAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb");
-    console.log("Wallet connected (mock)");
+    // Start with first voter wallet by default
+    setWalletAddress(VOTER_WALLETS[0]);
+    console.log("Wallet connected");
   };
 
   const handleDisconnectWallet = () => {
     setWalletAddress(undefined);
     console.log("Wallet disconnected");
+  };
+
+  const handleSwitchWallet = (wallet: string) => {
+    setWalletAddress(wallet);
+    console.log("Switched to wallet:", wallet);
   };
 
   return (
@@ -47,8 +53,9 @@ export default function App() {
             isAdmin={isAdmin}
             onConnectWallet={handleConnectWallet}
             onDisconnectWallet={handleDisconnectWallet}
+            onSwitchWallet={handleSwitchWallet}
           />
-          <Router />
+          <Router walletAddress={walletAddress} />
         </div>
         <Toaster />
       </TooltipProvider>

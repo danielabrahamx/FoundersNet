@@ -3,6 +3,11 @@ import EventCard from "@/components/EventCard";
 import BetModal from "@/components/BetModal";
 import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
+import { hasWalletBet, getWalletBet, recordBet, getAllBetsForEvent } from "@/lib/wallets";
+
+interface HomePageProps {
+  walletAddress?: string;
+}
 
 //todo: remove mock functionality
 const mockEvents = [
@@ -29,7 +34,6 @@ const mockEvents = [
     noBets: 18,
     totalYesPool: 320,
     totalNoPool: 180,
-    userBet: "YES" as const,
   },
   {
     id: 3,
@@ -55,7 +59,6 @@ const mockEvents = [
     totalYesPool: 500,
     totalNoPool: 300,
     outcome: "YES" as const,
-    userBet: "YES" as const,
   },
   {
     id: 5,
@@ -69,7 +72,6 @@ const mockEvents = [
     totalYesPool: 200,
     totalNoPool: 400,
     outcome: "NO" as const,
-    userBet: "NO" as const,
   },
   {
     id: 6,
@@ -85,7 +87,7 @@ const mockEvents = [
   },
 ];
 
-export default function HomePage() {
+export default function HomePage({ walletAddress }: HomePageProps) {
   const [betModal, setBetModal] = useState<{ open: boolean; event?: typeof mockEvents[0] }>({
     open: false,
   });
@@ -95,12 +97,19 @@ export default function HomePage() {
     ? mockEvents 
     : mockEvents.filter(e => e.status === filter);
 
+  const handlePlaceBet = (choice: "YES" | "NO") => {
+    if (betModal.event && walletAddress) {
+      recordBet(walletAddress, betModal.event.id, choice);
+      console.log('Bet placed:', choice, 'on event', betModal.event.id, 'by', walletAddress);
+    }
+  };
+
   return (
     <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
         <p className="text-muted-foreground">
-          Bet on which startups will reach $1M ARR. All bets are 10 MATIC on Polygon testnet.
+          Bet on which startups will raise Series A. All bets are 10 MATIC on Polygon testnet.
         </p>
       </div>
 
@@ -122,14 +131,26 @@ export default function HomePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredEvents.map((event) => (
-          <EventCard
-            key={event.id}
-            {...event}
-            onPlaceBet={() => setBetModal({ open: true, event })}
-            onClaim={() => console.log('Claim payout for event', event.id)}
-          />
-        ))}
+        {filteredEvents.map((event) => {
+          const userBet = walletAddress ? getWalletBet(walletAddress, event.id) : undefined;
+          const eventBets = getAllBetsForEvent(event.id);
+          const yesBetsCount = eventBets.filter(b => b.choice === "YES").length;
+          const noBetsCount = eventBets.filter(b => b.choice === "NO").length;
+
+          return (
+            <EventCard
+              key={event.id}
+              {...event}
+              yesBets={yesBetsCount || event.yesBets}
+              noBets={noBetsCount || event.noBets}
+              totalYesPool={(yesBetsCount || event.yesBets) * 10}
+              totalNoPool={(noBetsCount || event.noBets) * 10}
+              userBet={userBet}
+              onPlaceBet={() => setBetModal({ open: true, event })}
+              onClaim={() => console.log('Claim payout for event', event.id)}
+            />
+          );
+        })}
       </div>
 
       {betModal.event && (
@@ -139,7 +160,7 @@ export default function HomePage() {
           eventName={betModal.event.name}
           yesBets={betModal.event.yesBets}
           noBets={betModal.event.noBets}
-          onConfirm={(choice) => console.log('Bet placed:', choice, 'on event', betModal.event?.id)}
+          onConfirm={handlePlaceBet}
         />
       )}
     </div>

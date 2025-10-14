@@ -1,5 +1,6 @@
 import AdminEventForm from "@/components/AdminEventForm";
 import AdminEventsTable from "@/components/AdminEventsTable";
+import AdminWalletTracker from "@/components/AdminWalletTracker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 
@@ -74,6 +75,7 @@ export default function AdminPage() {
       <Tabs defaultValue="events" className="space-y-6">
         <TabsList>
           <TabsTrigger value="events" data-testid="tab-manage-events">Manage Events</TabsTrigger>
+          <TabsTrigger value="wallets" data-testid="tab-wallet-tracker">Wallet Tracker</TabsTrigger>
           <TabsTrigger value="create" data-testid="tab-create-event">Create Event</TabsTrigger>
         </TabsList>
 
@@ -82,6 +84,10 @@ export default function AdminPage() {
             events={mockAdminEvents}
             onResolve={(id, outcome) => console.log('Resolve event:', id, 'with outcome:', outcome)}
           />
+        </TabsContent>
+
+        <TabsContent value="wallets">
+          <AdminWalletTracker />
         </TabsContent>
 
         <TabsContent value="create">
