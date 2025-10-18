@@ -1,0 +1,36 @@
+[algokit]
+min_version = "v2.0.0"
+
+[project]
+type = 'workspace'
+projects_root_path = '.'
+
+[project.run]
+# Frontend commands
+dev-frontend = { commands = ['npm run dev:frontend'], description = 'Run frontend dev server with Vite' }
+build-frontend = { commands = ['npm run build:frontend'], description = 'Build frontend for production' }
+
+# Backend commands  
+dev-backend = { commands = ['npm run dev:backend'], description = 'Run Express.js backend server' }
+build-backend = { commands = ['npm run build:backend'], description = 'Build backend with esbuild' }
+
+# Smart contract commands
+compile = { commands = ['npm run compile:algorand'], description = 'Compile Algorand Python smart contracts' }
+deploy-local = { commands = ['npm run deploy:local'], description = 'Deploy smart contracts to LocalNet' }
+deploy-testnet = { commands = ['npm run deploy:testnet'], description = 'Deploy smart contracts to TestNet' }
+
+# LocalNet management
+localnet-start = { commands = ['npm run localnet:start'], description = 'Start AlgoKit LocalNet' }
+localnet-stop = { commands = ['npm run localnet:stop'], description = 'Stop AlgoKit LocalNet' }
+localnet-reset = { commands = ['npm run localnet:reset'], description = 'Reset AlgoKit LocalNet' }
+localnet-setup = { commands = ['npm run localnet:setup'], description = 'Start LocalNet and deploy contracts' }
+
+# Combined commands
+dev = { commands = ['npm run dev'], description = 'Run full stack (backend + frontend)' }
+build = { commands = ['npm run build'], description = 'Build full stack application' }
+
+# Testing and quality
+test = { commands = ['npm run test'], description = 'Run Algorand smart contract tests' }
+lint = { commands = ['npm run lint'], description = 'Lint frontend TypeScript code' }
+lint-fix = { commands = ['npm run lint:fix'], description = 'Fix linting issues automatically' }
+format = { commands = ['npm run format'], description = 'Format code with Prettier' }
