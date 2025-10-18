@@ -181,34 +181,56 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
   const globalInts = 16;
   const globalBytes = 8;
   
-  // Create application
-  // In algosdk v3, encode the admin address properly
-  // admin.addr should be a string, if it's not we have an issue
-  const adminAddr = typeof admin.addr === 'string' ? admin.addr : admin.addr.toString();
-  const adminAddressBytes = algosdk.decodeAddress(adminAddr);
+  // Create application using AtomicTransactionComposer for ARC-4 compatibility
+  const atc = new algosdk.AtomicTransactionComposer();
   
-  const createTxn = algosdk.makeApplicationCreateTxnFromObject({
+  // Define the create_application method from ABI (ARC-56)
+  const createAppMethod = new algosdk.ABIMethod({
+    name: 'create_application',
+    args: [
+      { type: 'address', name: 'admin' }
+    ],
+    returns: { type: 'void' }
+  });
+  
+  // Get the admin address as a string
+  const adminAddr = typeof admin.addr === 'string' ? admin.addr : admin.addr.toString();
+  
+  // Add method call to ATC
+  atc.addMethodCall({
+    appID: 0, // 0 means this is an app creation call
+    method: createAppMethod,
+    methodArgs: [adminAddr],
     sender: deployer.addr,
+    signer: algosdk.makeBasicAccountTransactionSigner(deployer),
     suggestedParams: params,
+    onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approval,
     clearProgram: clear,
-    numLocalInts: localInts,
-    numLocalByteSlices: localBytes,
     numGlobalInts: globalInts,
     numGlobalByteSlices: globalBytes,
-    onComplete: algosdk.OnApplicationComplete.NoOpOC,
-    appArgs: [
-      new Uint8Array(Buffer.from('create_application')),
-      adminAddressBytes.publicKey,
-    ],
+    numLocalInts: localInts,
+    numLocalByteSlices: localBytes,
     extraPages: 3, // Additional pages for box storage
   });
   
-  const signedTxn = createTxn.signTxn(deployer.sk);
-  const txId = await algodClient.sendRawTransaction(signedTxn).do();
-  const confirmedTxn = await waitForConfirmation(algodClient, txId.txId);
+  // Execute the transaction
+  const result = await atc.execute(algodClient, 4);
   
-  const appId = confirmedTxn['application-index'];
+  // Get the app ID from the method result (algosdk v3 uses camelCase: applicationIndex)
+  const txInfo = result.methodResults[0]?.txInfo;
+  let appId = txInfo?.applicationIndex;
+  
+  // Convert BigInt to Number if needed (algosdk v3 returns BigInt)
+  if (typeof appId === 'bigint') {
+    appId = Number(appId);
+  }
+  
+  if (!appId || typeof appId !== 'number') {
+    throw new Error(`Failed to get application ID from transaction result. App ID: ${appId}, type: ${typeof appId}`);
+  }
+  
+  console.log(`✅ Smart contract deployed! App ID: ${appId}`);
   const appAddress = algosdk.getApplicationAddress(appId);
   
   // Fund the application account with minimum balance
@@ -228,17 +250,20 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
 async function fundAccount(algodClient, sender, recipient, amount) {
   const params = await algodClient.getTransactionParams().do();
   const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: sender.addr,
-    to: recipient,
+    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
+    receiver: recipient, // algosdk v3: use 'receiver' instead of 'to'
     amount: amount,
     suggestedParams: params,
   });
   
   const signedTxn = paymentTxn.signTxn(sender.sk);
-  const txId = await algodClient.sendRawTransaction(signedTxn).do();
-  await waitForConfirmation(algodClient, txId.txId);
+  await algodClient.sendRawTransaction(signedTxn).do();
   
-  return txId.txId;
+  // Use the transaction's ID directly (algosdk v3)
+  const txId = paymentTxn.txID().toString();
+  await waitForConfirmation(algodClient, txId);
+  
+  return txId;
 }
 
 /**
@@ -261,7 +286,7 @@ async function callAppMethod(algodClient, sender, appId, methodName, methodArgs 
   ];
   
   const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    from: sender.addr,
+    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
     suggestedParams: params,
     appIndex: appId,
     appArgs: appArgs,
@@ -299,8 +324,8 @@ async function callAppMethod(algodClient, sender, appId, methodName, methodArgs 
 async function createPaymentTxn(algodClient, sender, receiver, amount) {
   const params = await algodClient.getTransactionParams().do();
   return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: sender.addr,
-    to: receiver,
+    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
+    receiver: receiver, // algosdk v3: use 'receiver' instead of 'to'
     amount: amount,
     suggestedParams: params,
   });

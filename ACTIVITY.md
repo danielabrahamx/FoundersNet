@@ -1,5 +1,152 @@
 # Project Activity Log
 
+## 2025-10-18: AlgoKit Fullstack Template Migration - Phase 2
+
+### Overview
+Successfully migrated core dependencies to align with AlgoKit fullstack template standards, including algosdk v3.0.0, algokit-utils v9.0.0, and modern wallet integration libraries. Implemented ARC-4 ABI-compliant smart contract deployment in tests.
+
+---
+
+### Major Changes
+
+#### 1. **Dependency Upgrades**
+- ✅ Upgraded algosdk from 2.7.0 → 3.0.0 (breaking changes handled)
+- ✅ Upgraded @algorandfoundation/algokit-utils from 6.0.0 → 9.0.0
+- ✅ Added @txnlab/use-wallet v4.0.0 + @txnlab/use-wallet-react v4.0.0 for multi-wallet support
+- ✅ Added vite-plugin-node-polyfills v0.22.0 for browser compatibility
+- ✅ Added ESLint + Prettier + TypeScript ESLint for code quality
+- ✅ Configured concurrently for parallel dev server management
+
+#### 2. **Configuration Files Created**
+- ✅ `.algokit.toml` - AlgoKit workspace configuration with 20+ commands
+- ✅ `.eslintrc.cjs` - ESLint configuration for TypeScript + React
+- ✅ `.prettierrc.cjs` - Code formatting standards
+- ✅ Enhanced `.env.template` - Comprehensive environment variables for LocalNet/TestNet/MainNet
+
+#### 3. **Vite Configuration Modernization**
+- ✅ Removed Replit-specific plugins (@replit/vite-plugin-*)
+- ✅ Added vite-plugin-node-polyfills with Buffer polyfill for algosdk browser compatibility
+- ✅ Added proxy configuration: `/api` → `http://localhost:5000`
+- ✅ Standardized port to 5173 (Vite default)
+
+#### 4. **Test Infrastructure Updates for algosdk v3.0.0**
+
+**Fixed Breaking API Changes:**
+- ✅ Updated all payment transactions: `from`/`to` → `sender`/`receiver`
+- ✅ Fixed `makePaymentTxnWithSuggestedParamsFromObject()` calls throughout test-utils.js
+- ✅ Fixed `makeApplicationNoOpTxnFromObject()` to use `sender` parameter
+- ✅ Updated transaction ID handling: use `.txID().toString()` instead of response fields
+
+**Implemented KMD-Based Account Funding:**
+- ✅ Replaced hardcoded mnemonic with KMD wallet integration
+- ✅ Added `generateFundedAccount()` function using `unencrypted-default-wallet`
+- ✅ Proper wallet handle acquisition and release in test setup
+- ✅ Accounts now funded from genesis (DISPENSER_ADDRESS) on LocalNet
+
+**Implemented ARC-4 ABI Deployment:**
+- ✅ Created smart contract deployment using `AtomicTransactionComposer`
+- ✅ Defined `create_application` method with proper ABI signature
+- ✅ Used `ABIMethod` class for type-safe method calling
+- ✅ Fixed BigInt → Number conversion for application ID
+- ✅ Corrected property name: `application-index` → `applicationIndex` (camelCase in algosdk v3)
+
+**Files Modified:**
+- `test/test-utils.js` - Complete rewrite of deployment and transaction functions
+- `.mocharc.json` - Updated to run only smart contract tests (avoid module cycles)
+- `smart_contracts/artifacts/` - Added compiled TEAL files with lowercase naming
+
+#### 5. **Test Results**
+
+**Current Status:**
+- ✅ 1 test passing: "Should initialize with zero events"
+- ⚠️ 23 tests failing due to method calling approach (not ABI-compliant)
+- ✅ Smart contracts deploying successfully (App IDs: 1213-1259)
+- ✅ Accounts creating and funding via KMD
+- ✅ LocalNet connectivity working
+
+**Error Pattern:**
+All failing tests hit the same issue: raw `callAppMethod()` uses manual argument encoding instead of ARC-4 ABI method composition. Error message: `logic eval error: err opcode executed. Details: app=XXXX, pc=207, opcodes=txna ApplicationArgs 0; match label3 label4...`
+
+**Root Cause:**
+The smart contract uses ARC-4 ABI method selectors (first 4 bytes of method signature hash). The test utilities encode method names as plain UTF-8 strings, which don't match the contract's expected selectors.
+
+**Required Fix:**
+Update all test method calls to use `AtomicTransactionComposer` + `ABIMethod` pattern (like deployment), instead of `callAppMethod()` helper function.
+
+#### 6. **Git Commits**
+- ✅ Commit 1: "Initial commit" - Base project structure
+- ✅ Commit 2: "feat: Refactor to AlgoKit fullstack template standards" - Dependency updates, config files
+- ✅ Commit 3: "test: Fix test configuration and utilities for algosdk v3.0.0" - KMD funding, ABI deployment, API fixes
+
+---
+
+### Key Learnings
+
+1. **algosdk v3.0.0 Breaking Changes:**
+   - All transaction creation functions use `sender`/`receiver` instead of `from`/`to`
+   - Response objects use camelCase properties (`applicationIndex` not `application-index`)
+   - Transaction IDs must be extracted via `.txID().toString()` not from response
+   - BigInt values returned by API need conversion to Number for compatibility
+
+2. **ARC-4 ABI Standard is Mandatory:**
+   - Smart contracts compiled with Algorand Python use ARC-4 method selectors
+   - Cannot call methods with raw UTF-8 encoded method names
+   - Must use `ABIMethod` + `AtomicTransactionComposer` for all contract interactions
+   - ABI method signature: `method_name(arg1_type,arg2_type)return_type`
+
+3. **KMD Wallet for LocalNet:**
+   - AlgoKit LocalNet uses KMD (Key Management Daemon) for account management
+   - Dispenser account (genesis) has pre-funded balance for testing
+   - Wallet handles must be acquired and released properly
+   - Wallet name: `unencrypted-default-wallet`, password: `empty string`
+
+4. **Testing Best Practices:**
+   - Deploy fresh contract for each test (avoid state pollution)
+   - Use proper ABI method calling for production-like testing
+   - Test utilities should mirror frontend implementation patterns
+   - Mocha configuration must avoid module cycles (specify exact test files)
+
+---
+
+### Next Steps
+
+#### Immediate (High Priority)
+1. **Refactor Test Method Calling** - Update `callAppMethod()` and all test calls to use ARC-4 ABI approach
+2. **Load ARC-56 ABI** - Parse `PredictionMarket.arc56.json` to get method signatures
+3. **Update Test Helper Functions** - Create ABI-aware wrappers for create_event, place_bet, resolve_event, etc.
+4. **Get All Tests Passing** - Validate full smart contract functionality
+
+#### Short-Term (Medium Priority)
+5. **Frontend Build Verification** - Run `npm run build:frontend` to check TypeScript compilation
+6. **Wallet Integration Refactoring** - Update `AlgorandApp.tsx` to use @txnlab/use-wallet-react
+7. **End-to-End Testing** - Deploy to LocalNet and test full user workflows
+
+#### Long-Term (Low Priority)
+8. **Documentation Updates** - Update README.md with AlgoKit commands and testing instructions
+9. **TestNet Deployment** - Verify deployment scripts work with new dependencies
+10. **Performance Optimization** - Review and optimize contract calls and state management
+
+---
+
+### Technical Debt
+
+- [ ] Test utilities still use raw transaction construction for non-deployment methods
+- [ ] Frontend not yet using multi-wallet support (@txnlab/use-wallet-react)
+- [ ] No TypeScript strict mode enabled
+- [ ] Security audit needed for smart contract deployment funding amounts
+- [ ] Test suite timeout configuration needs tuning (current: 30s)
+
+---
+
+### Resources
+
+- **algosdk v3 Migration Guide**: https://github.com/algorand/js-algorand-sdk/blob/develop/MIGRATION.md
+- **AlgoKit Documentation**: https://github.com/algorandfoundation/algokit-cli
+- **ARC-4 ABI Spec**: https://arc.algorand.foundation/ARCs/arc-0004
+- **ARC-56 Contract Interface**: https://arc.algorand.foundation/ARCs/arc-0056
+
+---
+
 ## 2025-10-18: Complete Migration from Polygon to Algorand
 
 ### Overview
