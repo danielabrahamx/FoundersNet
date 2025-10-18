@@ -1,106 +1,189 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import EventCard from "@/components/EventCard";
 import BetModal from "@/components/BetModal";
+import MockModeBanner from "@/components/MockModeBanner";
 import { Button } from "@/components/ui/button";
-import { Filter } from "lucide-react";
-import { hasWalletBet, getWalletBet, recordBet, getAllBetsForEvent } from "@/lib/wallets";
+import { Filter, Loader2 } from "lucide-react";
+import { useAllEvents } from "@/hooks/useEvents";
+import { useGetUserBets, useClaimWinnings } from "@/hooks/useAlgorandPredictionMarket";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+
+// Helper to format microAlgos to ALGO
+const formatAlgo = (microAlgos: bigint): string => {
+  return (Number(microAlgos) / 1_000_000).toFixed(2);
+};
 
 interface HomePageProps {
-  walletAddress?: string;
+  walletAddress?: `0x${string}`;
 }
 
-//todo: remove mock functionality
-const mockEvents = [
-  {
-    id: 1,
-    emoji: "🚀",
-    name: "TechFlow AI",
-    description: "AI-powered workflow automation platform targeting SMBs with advanced no-code capabilities and enterprise-grade security",
-    endTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-    status: "OPEN" as const,
-    yesBets: 45,
-    noBets: 23,
-    totalYesPool: 450,
-    totalNoPool: 230,
-  },
-  {
-    id: 2,
-    emoji: "☁️",
-    name: "CloudScale Pro",
-    description: "Infrastructure management platform for multi-cloud deployments with automated cost optimization",
-    endTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    status: "OPEN" as const,
-    yesBets: 32,
-    noBets: 18,
-    totalYesPool: 320,
-    totalNoPool: 180,
-  },
-  {
-    id: 3,
-    emoji: "💾",
-    name: "DataSync Hub",
-    description: "Real-time data synchronization service for distributed teams with end-to-end encryption",
-    endTime: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    status: "CLOSED" as const,
-    yesBets: 28,
-    noBets: 22,
-    totalYesPool: 280,
-    totalNoPool: 220,
-  },
-  {
-    id: 4,
-    emoji: "🏢",
-    name: "OfficeFlow",
-    description: "Smart office management system with IoT integration for workplace optimization",
-    endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    status: "RESOLVED" as const,
-    yesBets: 50,
-    noBets: 30,
-    totalYesPool: 500,
-    totalNoPool: 300,
-    outcome: "YES" as const,
-  },
-  {
-    id: 5,
-    emoji: "💡",
-    name: "BrightIdeas",
-    description: "Innovation management platform connecting employees with R&D teams for crowdsourced solutions",
-    endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    status: "RESOLVED" as const,
-    yesBets: 20,
-    noBets: 40,
-    totalYesPool: 200,
-    totalNoPool: 400,
-    outcome: "NO" as const,
-  },
-  {
-    id: 6,
-    emoji: "🔐",
-    name: "SecureVault Pro",
-    description: "Zero-knowledge password manager for enterprises with biometric authentication",
-    endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    status: "OPEN" as const,
-    yesBets: 15,
-    noBets: 10,
-    totalYesPool: 150,
-    totalNoPool: 100,
-  },
-];
+type EventStatus = "OPEN" | "CLOSED" | "RESOLVED";
+
+interface ContractEvent {
+  eventId: number;  // Changed from id: bigint to match API response
+  name: string;
+  endTime: number;  // Changed from bigint
+  resolved: boolean;
+  outcome: boolean;
+  totalYesBets: number;  // Changed from bigint
+  totalNoBets: number;  // Changed from bigint
+  totalYesAmount: string;  // Changed from bigint to string (API returns as string)
+  totalNoAmount: string;  // Changed from bigint to string (API returns as string)
+}
 
 export default function HomePage({ walletAddress }: HomePageProps) {
-  const [betModal, setBetModal] = useState<{ open: boolean; event?: typeof mockEvents[0] }>({
+  const [betModal, setBetModal] = useState<{ open: boolean; event?: ContractEvent }>({
     open: false,
   });
   const [filter, setFilter] = useState<"ALL" | "OPEN" | "CLOSED" | "RESOLVED">("ALL");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const filteredEvents = filter === "ALL" 
-    ? mockEvents 
-    : mockEvents.filter(e => e.status === filter);
+  // Fetch all events from contract
+  const { data: events, isLoading, error } = useAllEvents();
+  
+  // Fetch user bets if wallet connected
+  const { data: userBets } = useGetUserBets(walletAddress || null);
+  
+  // Hook for claiming winnings
+  const { claimWinnings } = useClaimWinnings();
+
+  // Determine event status based on contract data
+  const getEventStatus = (event: ContractEvent): EventStatus => {
+    if (event.resolved) {
+      return "RESOLVED";
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const endTime = Number(event.endTime);
+    return now >= endTime ? "CLOSED" : "OPEN";
+  };
+
+  // Get user's bet for a specific event
+  const getUserBetForEvent = (eventId: number): { choice: "YES" | "NO"; betId: number; claimed: boolean } | undefined => {
+    if (!userBets || !Array.isArray(userBets)) return undefined;
+    
+    const bet = userBets.find((b: any) => b.eventId === eventId);
+    if (!bet) return undefined;
+    
+    return {
+      choice: bet.outcome ? "YES" : "NO",
+      betId: Number(bet.betId),
+      claimed: bet.claimed,
+    };
+  };
+
+  // Filter events based on selected filter
+  const filteredEvents = useMemo(() => {
+    if (!events || !Array.isArray(events)) return [];
+    
+    if (filter === "ALL") return events;
+    
+    return events.filter((event: ContractEvent) => {
+      const status = getEventStatus(event);
+      return status === filter;
+    });
+  }, [events, filter]);
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading events from blockchain...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-destructive font-semibold">Error loading events</p>
+            <p className="text-sm text-muted-foreground">
+              Please make sure you're connected to Algorand LocalNet with Pera Wallet
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no events
+  if (!events || !Array.isArray(events) || events.length === 0) {
+    return (
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
+          <p className="text-muted-foreground">
+            Bet on which startups will raise Series A. All bets are on Algorand TestNet.
+          </p>
+        </div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-muted-foreground">No events available yet.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handlePlaceBet = (choice: "YES" | "NO") => {
     if (betModal.event && walletAddress) {
-      recordBet(walletAddress, betModal.event.id, choice);
-      console.log('Bet placed:', choice, 'on event', betModal.event.id, 'by', walletAddress);
+      console.log('Bet placed:', choice, 'on event', betModal.event.eventId, 'by', walletAddress);
+    }
+  };
+
+  const handleClaimPayout = async (eventId: number) => {
+    if (!walletAddress) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to claim winnings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const userBet = getUserBetForEvent(eventId);
+    if (!userBet) {
+      toast({
+        title: "No Bet Found",
+        description: "You don't have a bet on this event.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (!walletAddress) {
+        toast({
+          title: "Wallet Not Connected",
+          description: "Please connect your wallet.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await claimWinnings(Number(userBet.betId), walletAddress);
+      
+      toast({
+        title: "Winnings Claimed! 🎉",
+        description: "Your winnings have been transferred to your wallet.",
+      });
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['userBets'] });
+      queryClient.invalidateQueries({ queryKey: ['allEvents'] });
+    } catch (error) {
+      console.error('Error claiming winnings:', error);
+      toast({
+        title: "Claim Failed",
+        description: error instanceof Error ? error.message : "Failed to claim winnings. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -109,7 +192,7 @@ export default function HomePage({ walletAddress }: HomePageProps) {
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
         <p className="text-muted-foreground">
-          Bet on which startups will raise Series A. All bets are 10 MATIC on Polygon testnet.
+          Bet on which startups will raise Series A. All bets are on Algorand TestNet.
         </p>
       </div>
 
@@ -131,23 +214,29 @@ export default function HomePage({ walletAddress }: HomePageProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredEvents.map((event) => {
-          const userBet = walletAddress ? getWalletBet(walletAddress, event.id) : undefined;
-          const eventBets = getAllBetsForEvent(event.id);
-          const yesBetsCount = eventBets.filter(b => b.choice === "YES").length;
-          const noBetsCount = eventBets.filter(b => b.choice === "NO").length;
+        {filteredEvents.map((event: ContractEvent) => {
+          const status = getEventStatus(event);
+          const userBetData = getUserBetForEvent(event.eventId);
+          const eventId = event.eventId;
 
           return (
             <EventCard
-              key={event.id}
-              {...event}
-              yesBets={yesBetsCount || event.yesBets}
-              noBets={noBetsCount || event.noBets}
-              totalYesPool={(yesBetsCount || event.yesBets) * 10}
-              totalNoPool={(noBetsCount || event.noBets) * 10}
-              userBet={userBet}
+              key={eventId}
+              id={eventId}
+              emoji="🚀"
+              name={event.name}
+              description={`Event #${eventId}`}
+              endTime={Number(event.endTime)}
+              status={status}
+              yesBets={Number(event.totalYesBets)}
+              noBets={Number(event.totalNoBets)}
+              totalYesPool={parseFloat(event.totalYesAmount) / 1_000_000}
+              totalNoPool={parseFloat(event.totalNoAmount) / 1_000_000}
+              userBet={userBetData?.choice}
+              outcome={event.resolved ? (event.outcome ? "YES" : "NO") : undefined}
               onPlaceBet={() => setBetModal({ open: true, event })}
-              onClaim={() => console.log('Claim payout for event', event.id)}
+              onClaim={() => handleClaimPayout(eventId)}
+              hasClaimed={userBetData?.claimed}
             />
           );
         })}
@@ -157,10 +246,10 @@ export default function HomePage({ walletAddress }: HomePageProps) {
         <BetModal
           open={betModal.open}
           onClose={() => setBetModal({ open: false })}
+          eventId={Number(betModal.event.eventId)}
           eventName={betModal.event.name}
-          yesBets={betModal.event.yesBets}
-          noBets={betModal.event.noBets}
-          onConfirm={handlePlaceBet}
+          yesBets={Number(betModal.event.totalYesBets)}
+          noBets={Number(betModal.event.totalNoBets)}
         />
       )}
     </div>

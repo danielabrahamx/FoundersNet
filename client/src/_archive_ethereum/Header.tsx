@@ -1,20 +1,17 @@
 import { Link, useLocation } from "wouter";
-import WalletButton from "./WalletButton";
-import WalletSwitcher from "./WalletSwitcher";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import ThemeToggle from "./ThemeToggle";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ADMIN_ADDRESS } from "@shared/contracts";
 
-interface HeaderProps {
-  walletAddress?: string;
-  isAdmin?: boolean;
-  onConnectWallet: () => void;
-  onDisconnectWallet: () => void;
-  onSwitchWallet?: (wallet: string) => void;
-}
-
-export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisconnectWallet, onSwitchWallet }: HeaderProps) {
+export default function Header() {
   const [location] = useLocation();
+  const { address, isConnected } = useAccount();
+  
+  // Check if connected wallet is admin
+  const isAdmin = isConnected && address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
 
   const navItems = [
     { path: "/", label: "Home" },
@@ -29,7 +26,7 @@ export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisc
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2 hover-elevate px-2 py-1 rounded-md" data-testid="link-home">
               <TrendingUp className="w-6 h-6 text-primary" />
-              <span className="font-bold text-lg hidden sm:inline">Startup Markets</span>
+              <span className="font-bold text-lg hidden sm:inline">FoundersNet</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-1">
@@ -53,18 +50,10 @@ export default function Header({ walletAddress, isAdmin, onConnectWallet, onDisc
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {walletAddress && onSwitchWallet ? (
-              <WalletSwitcher 
-                currentWallet={walletAddress}
-                onSelectWallet={onSwitchWallet}
-              />
-            ) : (
-              <WalletButton
-                address={walletAddress}
-                onConnect={onConnectWallet}
-                onDisconnect={onDisconnectWallet}
-              />
-            )}
+            <ConnectButton 
+              chainStatus="icon"
+              showBalance={false}
+            />
           </div>
         </div>
 

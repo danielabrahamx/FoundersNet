@@ -2,7 +2,7 @@ import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface CountdownTimerProps {
-  endTime: Date;
+  endTime: number; // UNIX timestamp in seconds
   onExpire?: () => void;
 }
 
@@ -11,20 +11,19 @@ export default function CountdownTimer({ endTime, onExpire }: CountdownTimerProp
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const now = new Date().getTime();
-      const end = new Date(endTime).getTime();
-      const difference = end - now;
+      const now = Math.floor(Date.now() / 1000); // Current time in seconds
+      const difference = endTime - now;
 
       if (difference <= 0) {
-        setTimeLeft("Expired");
+        setTimeLeft("Closed");
         onExpire?.();
         return;
       }
 
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+      const days = Math.floor(difference / (60 * 60 * 24));
+      const hours = Math.floor((difference % (60 * 60 * 24)) / (60 * 60));
+      const minutes = Math.floor((difference % (60 * 60)) / 60);
+      const seconds = Math.floor(difference % 60);
 
       if (days > 0) {
         setTimeLeft(`${days}d ${hours}h ${minutes}m`);

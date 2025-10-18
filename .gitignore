@@ -4,3 +4,16 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Algorand specific
+smart_contracts/artifacts/
+.algokit/
+
+# LocalNet artifacts (development only)
+localnet-accounts.json
+deployments/localnet.json
+.env.backup
+
+# Environment files
+.env
+.env.local

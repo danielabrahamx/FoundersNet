@@ -11,7 +11,7 @@ interface EventCardProps {
   emoji: string;
   name: string;
   description: string;
-  endTime: Date;
+  endTime: number; // UNIX timestamp in seconds
   status: EventStatus;
   yesBets: number;
   noBets: number;
@@ -21,6 +21,7 @@ interface EventCardProps {
   onPlaceBet?: () => void;
   onClaim?: () => void;
   outcome?: "YES" | "NO";
+  hasClaimed?: boolean;
 }
 
 export default function EventCard({
@@ -38,12 +39,13 @@ export default function EventCard({
   onPlaceBet,
   onClaim,
   outcome,
+  hasClaimed,
 }: EventCardProps) {
   const totalBets = yesBets + noBets;
   const yesPercentage = totalBets > 0 ? (yesBets / totalBets) * 100 : 50;
   const noPercentage = totalBets > 0 ? (noBets / totalBets) * 100 : 50;
 
-  const canClaim = status === "RESOLVED" && userBet === outcome && onClaim;
+  const canClaim = status === "RESOLVED" && userBet === outcome && onClaim && !hasClaimed;
   const userLost = status === "RESOLVED" && userBet && userBet !== outcome;
 
   return (
@@ -93,8 +95,8 @@ export default function EventCard({
           </div>
 
           <div className="flex items-center justify-between text-sm font-mono">
-            <span className="text-bet-yes" data-testid="text-yes-pool">{totalYesPool} MATIC</span>
-            <span className="text-bet-no" data-testid="text-no-pool">{totalNoPool} MATIC</span>
+            <span className="text-bet-yes" data-testid="text-yes-pool">{totalYesPool} ALGO</span>
+            <span className="text-bet-no" data-testid="text-no-pool">{totalNoPool} ALGO</span>
           </div>
         </div>
 
@@ -110,6 +112,12 @@ export default function EventCard({
           </div>
         )}
 
+        {hasClaimed && (
+          <div className="p-3 rounded-md bg-primary/10 border border-primary/20 text-sm text-center text-primary font-medium" data-testid="text-claimed">
+            ✓ Winnings Claimed
+          </div>
+        )}
+
         {canClaim && (
           <Button className="w-full" onClick={onClaim} data-testid="button-claim">
             Claim Payout
@@ -118,7 +126,7 @@ export default function EventCard({
 
         {status === "OPEN" && !userBet && (
           <Button className="w-full" onClick={onPlaceBet} data-testid="button-place-bet">
-            Place Bet (10 MATIC)
+            Place Bet (10 ALGO)
           </Button>
         )}
 

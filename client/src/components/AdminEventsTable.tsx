@@ -19,7 +19,7 @@ interface AdminEvent {
   status: EventStatus;
   yesBets: number;
   noBets: number;
-  endTime: Date;
+  endTime: number; // Unix timestamp in seconds
   outcome?: "YES" | "NO";
 }
 
@@ -33,11 +33,34 @@ export default function AdminEventsTable({ events, onResolve }: AdminEventsTable
     open: false,
     eventId: null,
   });
+  const [isResolving, setIsResolving] = useState(false);
 
-  const handleResolve = (outcome: "YES" | "NO") => {
-    if (resolveModal.eventId) {
-      onResolve(resolveModal.eventId, outcome);
-      setResolveModal({ open: false, eventId: null });
+  const handleResolve = async (outcome: "YES" | "NO") => {
+    console.log('🎯 AdminEventsTable.handleResolve called:', {
+      eventId: resolveModal.eventId,
+      outcome,
+      isResolving
+    });
+    
+    if (resolveModal.eventId && !isResolving) {
+      setIsResolving(true);
+      try {
+        console.log('📞 Calling onResolve prop function...');
+        await onResolve(resolveModal.eventId, outcome);
+        console.log('✅ onResolve completed successfully');
+        // Only close on success
+        setResolveModal({ open: false, eventId: null });
+      } catch (error) {
+        console.error('❌ Error resolving event:', error);
+        // Keep modal open so user can see error and try again
+      } finally {
+        setIsResolving(false);
+      }
+    } else {
+      console.log('⚠️ Resolve conditions not met:', { 
+        hasEventId: !!resolveModal.eventId, 
+        isResolving 
+      });
     }
   };
 
@@ -62,8 +85,8 @@ export default function AdminEventsTable({ events, onResolve }: AdminEventsTable
                       <span className="text-muted-foreground">NO</span>
                     </div>
                     <span className="text-muted-foreground">•</span>
-                    <span className="font-mono text-muted-foreground">
-                      {(event.yesBets + event.noBets) * 10} MATIC
+                  <span className="text-xs text-muted-foreground">
+                      {(event.yesBets + event.noBets) * 10} ALGO
                     </span>
                   </div>
                 </div>
@@ -73,13 +96,14 @@ export default function AdminEventsTable({ events, onResolve }: AdminEventsTable
                 {event.status !== "RESOLVED" && <CountdownTimer endTime={event.endTime} />}
                 <EventStatusBadge status={event.status} />
                 
-                {event.status === "CLOSED" && (
+                {(event.status === "OPEN" || event.status === "CLOSED") && (
                   <Button
                     size="sm"
                     onClick={() => setResolveModal({ open: true, eventId: event.id })}
                     data-testid={`button-resolve-${event.id}`}
+                    variant={event.status === "OPEN" ? "outline" : "default"}
                   >
-                    Resolve
+                    {event.status === "OPEN" ? "Resolve Early" : "Resolve"}
                   </Button>
                 )}
 
@@ -109,26 +133,39 @@ export default function AdminEventsTable({ events, onResolve }: AdminEventsTable
               <Button
                 variant="outline"
                 className="h-20 border-bet-yes hover:bg-bet-yes/10"
-                onClick={() => handleResolve("YES")}
+                onClick={() => {
+                  console.log('🟢 YES button clicked!');
+                  handleResolve("YES");
+                }}
+                disabled={isResolving}
                 data-testid="button-resolve-yes"
               >
                 <div className="text-center">
                   <div className="text-2xl font-bold text-bet-yes">YES</div>
-                  <div className="text-xs text-muted-foreground">Reached $1M ARR</div>
+                  <div className="text-xs text-muted-foreground">Event occurred</div>
                 </div>
               </Button>
               <Button
                 variant="outline"
                 className="h-20 border-bet-no hover:bg-bet-no/10"
-                onClick={() => handleResolve("NO")}
+                onClick={() => {
+                  console.log('🔴 NO button clicked!');
+                  handleResolve("NO");
+                }}
+                disabled={isResolving}
                 data-testid="button-resolve-no"
               >
                 <div className="text-center">
                   <div className="text-2xl font-bold text-bet-no">NO</div>
-                  <div className="text-xs text-muted-foreground">Did not reach</div>
+                  <div className="text-xs text-muted-foreground">Event did not occur</div>
                 </div>
               </Button>
             </div>
+            {isResolving && (
+              <p className="text-sm text-center text-muted-foreground">
+                Processing transaction... Please wait.
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
