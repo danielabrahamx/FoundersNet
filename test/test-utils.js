@@ -58,22 +58,62 @@ function createIndexerClient(network = 'localnet') {
 async function generateFundedAccount(algodClient, fundingAmount = 100_000_000) {
   const account = algosdk.generateAccount();
   
-  // For LocalNet, fund from the default dispenser account
-  if (process.env.NETWORK === 'localnet') {
-    const dispenserMnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon';
-    const dispenser = algosdk.mnemonicToSecretKey(dispenserMnemonic);
-    
-    const params = await algodClient.getTransactionParams().do();
-    const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-      from: dispenser.addr,
-      to: account.addr,
-      amount: fundingAmount,
-      suggestedParams: params,
-    });
-    
-    const signedTxn = paymentTxn.signTxn(dispenser.sk);
-    await algodClient.sendRawTransaction(signedTxn).do();
-    await waitForConfirmation(algodClient, paymentTxn.txID().toString());
+  // For LocalNet, fund from KMD wallet (AlgoKit standard)
+  if (process.env.NETWORK === 'localnet' || !process.env.NETWORK) {
+    try {
+      // Use KMD to get a funded account
+      const kmdToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const kmdServer = 'http://localhost';
+      const kmdPort = '4002';
+      const kmdClient = new algosdk.Kmd(kmdToken, kmdServer, kmdPort);
+      
+      // List wallets
+      const wallets = await kmdClient.listWallets();
+      const defaultWallet = wallets.wallets.find(w => w.name === 'unencrypted-default-wallet');
+      
+      if (!defaultWallet) {
+        throw new Error('Default wallet not found in LocalNet KMD');
+      }
+      
+      // Get wallet handle
+      const walletHandle = await kmdClient.initWalletHandle(defaultWallet.id, '');
+      
+      // Get first account from wallet (this is the genesis account with funds)
+      const addresses = await kmdClient.listKeys(walletHandle.wallet_handle_token);
+      const dispenserAddr = addresses.addresses[0];
+      
+      // Export private key
+      const accountKey = await kmdClient.exportKey(
+        walletHandle.wallet_handle_token,
+        '',
+        dispenserAddr
+      );
+      
+      const dispenser = {
+        addr: dispenserAddr,
+        sk: accountKey.private_key,
+      };
+      
+      // Create and send funding transaction
+      const params = await algodClient.getTransactionParams().do();
+      const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        sender: dispenser.addr,
+        receiver: account.addr,
+        amount: fundingAmount,
+        suggestedParams: params,
+      });
+      
+      const signedTxn = paymentTxn.signTxn(dispenser.sk);
+      await algodClient.sendRawTransaction(signedTxn).do();
+      await waitForConfirmation(algodClient, paymentTxn.txID().toString());
+      
+      // Release wallet handle
+      await kmdClient.releaseWalletHandle(walletHandle.wallet_handle_token);
+      
+    } catch (error) {
+      console.error('Error funding account from KMD:', error.message);
+      throw error;
+    }
   }
   
   return account;
@@ -142,8 +182,13 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
   const globalBytes = 8;
   
   // Create application
+  // In algosdk v3, encode the admin address properly
+  // admin.addr should be a string, if it's not we have an issue
+  const adminAddr = typeof admin.addr === 'string' ? admin.addr : admin.addr.toString();
+  const adminAddressBytes = algosdk.decodeAddress(adminAddr);
+  
   const createTxn = algosdk.makeApplicationCreateTxnFromObject({
-    from: deployer.addr,
+    sender: deployer.addr,
     suggestedParams: params,
     approvalProgram: approval,
     clearProgram: clear,
@@ -154,7 +199,7 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     appArgs: [
       new Uint8Array(Buffer.from('create_application')),
-      algosdk.decodeAddress(admin.addr).publicKey,
+      adminAddressBytes.publicKey,
     ],
     extraPages: 3, // Additional pages for box storage
   });
