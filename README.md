@@ -11,7 +11,7 @@
 ** Smart Contract:** Algorand ARC-4 (Python  TEAL)
 
 ---
-
+## DEMO VIDEO : https://m.youtube.com/watch?v=kjgx7n%E2%80%94scq&feature=youtu.be
 ##  What It Does
 
 A trustless prediction market where users bet ALGO on startup funding outcomes:
