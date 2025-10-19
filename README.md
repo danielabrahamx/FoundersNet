@@ -11,7 +11,7 @@
 ** Smart Contract:** Algorand ARC-4 (Python  TEAL)
 
 ---
-## DEMO VIDEO : https://m.youtube.com/watch?v=kjgx7n%E2%80%94scq&feature=youtu.be
+## DEMO VIDEO : [https://m.youtube.com/watch?v=kjgx7n%E2%80%94scq&feature=youtu.be](https://www.youtube.com/watch?v=KjGx7n--ScQ)
 ## CODE OVERVIEW VIDEO https://youtu.be/6d1tBbY2YwE
 ##  What It Does
 
