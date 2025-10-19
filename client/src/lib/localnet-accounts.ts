@@ -41,16 +41,16 @@ export const LOCALNET_ACCOUNTS: LocalNetAccount[] = [
 
 /**
  * Get currently active LocalNet account from localStorage
- * If not set, initializes to the first user account (Alice), NOT admin
+ * If not set, initializes to the Admin account for easier demo/testing
  */
 export function getActiveLocalNetAccount(): string {
-  if (typeof window === 'undefined') return LOCALNET_ACCOUNTS[1].address; // Default to Alice (User 1)
+  if (typeof window === 'undefined') return LOCALNET_ACCOUNTS[0].address; // Default to Admin
   
   const stored = localStorage.getItem('localnet_active_account');
   
-  // If nothing stored, initialize to first user account (Alice, not Admin)
+  // If nothing stored, initialize to Admin account for demo purposes
   if (!stored) {
-    const defaultAccount = LOCALNET_ACCOUNTS[1].address; // Alice (User 1)
+    const defaultAccount = LOCALNET_ACCOUNTS[0].address; // Admin Account
     localStorage.setItem('localnet_active_account', defaultAccount);
     return defaultAccount;
   }

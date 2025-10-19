@@ -142,9 +142,9 @@ export function useWalletAddress() {
     }
 
     // Listen for connection changes
-    wallet.connector?.on('connect', (accounts: string[]) => {
-      if (accounts.length > 0) {
-        setAddress(accounts[0]);
+    wallet.connector?.on('connect', (error: Error | null, payload: any) => {
+      if (!error && payload?.accounts && payload.accounts.length > 0) {
+        setAddress(payload.accounts[0]);
       }
     });
 
@@ -364,12 +364,12 @@ export function usePlaceBet() {
 
       // Fetch current bet counter to know which bet box will be created
       const appInfo = await algodClient.getApplicationByID(PREDICTION_MARKET_APP_ID).do();
-      const globalState = appInfo.params['global-state'] || [];
+      const globalState = appInfo.params.globalState || []; // algosdk v3 uses camelCase
       let betCounter = 0;
       for (const item of globalState) {
-        const key = Buffer.from(item.key, 'base64').toString();
+        const key = new TextDecoder().decode(item.key); // algosdk v3 returns Uint8Array
         if (key === 'bet_counter') {
-          betCounter = item.value.uint || 0;
+          betCounter = Number(item.value.uint) || 0; // Convert BigInt to Number
           break;
         }
       }
@@ -380,8 +380,8 @@ export function usePlaceBet() {
       
       // Create payment transaction
       const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        from: senderAddress,
-        to: appAddress,
+        sender: senderAddress,
+        receiver: appAddress,
         amount: algoToMicroAlgo(amount),
         suggestedParams: params,
       });
@@ -461,11 +461,12 @@ export function usePlaceBet() {
           }
           
           const signerAccount = algosdk.mnemonicToSecretKey(account.mnemonic);
+          const signerAddress_actual = algosdk.encodeAddress(signerAccount.addr.publicKey);
           console.log('🔑 Signing with account:', {
             name: account.name,
             address: account.address,
-            signerAddress: signerAccount.addr,
-            matches: signerAccount.addr === senderAddress
+            signerAddress: signerAddress_actual,
+            matches: signerAddress_actual === senderAddress
           });
           signedTxns = txns.map(txn => txn.signTxn(signerAccount.sk));
         } else {
@@ -479,7 +480,7 @@ export function usePlaceBet() {
       }
       
       // Send to network
-      const { txId: txnId } = await algodClient.sendRawTransaction(signedTxns).do();
+      const { txid: txnId } = await algodClient.sendRawTransaction(signedTxns).do();
 
       // Wait for confirmation
       await waitForConfirmation(txnId);
@@ -527,14 +528,14 @@ export function useCreateEvent() {
       // Read current event_counter to predict next event_id
       const algodClient = createAlgodClient();
       const appInfo = await algodClient.getApplicationByID(PREDICTION_MARKET_APP_ID).do();
-      const globalState = appInfo.params['global-state'] || [];
+      const globalState = appInfo.params.globalState || [];
       
       // Find event_counter in global state
       let eventCounter = 0;
       for (const item of globalState) {
-        const key = Buffer.from(item.key, 'base64').toString();
+        const key = new TextDecoder().decode(item.key);
         if (key === 'event_counter') {
-          eventCounter = item.value.uint || 0;
+          eventCounter = Number(item.value.uint) || 0; // Convert BigInt to Number
           break;
         }
       }
@@ -586,7 +587,7 @@ export function useCreateEvent() {
 
       // Create application call transaction with box references
       const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-        from: senderAddress,
+        sender: senderAddress,
         appIndex: PREDICTION_MARKET_APP_ID,
         appArgs: [
           methodSelector,
@@ -706,11 +707,12 @@ export function useResolveEvent() {
         }
         
         const signerAccount = algosdk.mnemonicToSecretKey(account.mnemonic);
+        const signerAddress_actual = algosdk.encodeAddress(signerAccount.addr.publicKey);
         console.log('🔑 Signing with account:', {
           name: account.name,
           address: account.address,
-          signerAddress: signerAccount.addr,
-          matches: signerAccount.addr === senderAddress
+          signerAddress: signerAddress_actual,
+          matches: signerAddress_actual === senderAddress
         });
         signedTxns = txns.map(txn => txn.signTxn(signerAccount.sk));
       } else {
@@ -721,7 +723,7 @@ export function useResolveEvent() {
       }
       
       // Send to network
-      const { txId: txnId } = await algodClient.sendRawTransaction(signedTxns).do();
+      const { txid: txnId } = await algodClient.sendRawTransaction(signedTxns).do();
 
       console.log('✅ Event resolution transaction sent:', txnId);
 
@@ -769,20 +771,96 @@ export function useClaimWinnings() {
 
     try {
       const params = await getSuggestedParams();
+      // Increase fee to cover inner transaction (app call + payment = 2000 microAlgos)
+      params.fee = 2000;
+      params.flatFee = true;
 
-      // Create application call transaction
-      const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-        from: senderAddress,
-        appIndex: PREDICTION_MARKET_APP_ID,
-        appArgs: [
-          new Uint8Array(Buffer.from('claim_winnings')),
-          algosdk.encodeUint64(betId),
+      // First, fetch the bet to determine which event it belongs to
+      const algodClient = createAlgodClient();
+      const betsPrefix = new Uint8Array([98, 101, 116, 115]); // 'bets' in bytes
+      const betIdBytes = algosdk.encodeUint64(betId);
+      const betsBoxName = new Uint8Array(betsPrefix.length + betIdBytes.length);
+      betsBoxName.set(betsPrefix, 0);
+      betsBoxName.set(betIdBytes, betsPrefix.length);
+      
+      // Read the bet box to get the event_id
+      const betBoxResponse = await algodClient.getApplicationBoxByName(PREDICTION_MARKET_APP_ID, betsBoxName).do();
+      const betData = betBoxResponse.value;
+      
+      // Parse event_id from bet struct (bytes 8-15)
+      const eventIdBuffer = Buffer.from(betData.slice(8, 16));
+      const eventId = Number(eventIdBuffer.readBigUInt64BE(0));
+      
+      console.log(`📦 Claiming bet ${betId} for event ${eventId}`);
+
+      // Define the claim_winnings ABI method
+      const claimWinningsMethod = new algosdk.ABIMethod({
+        name: 'claim_winnings',
+        args: [
+          { type: 'uint64', name: 'bet_id' }
         ],
-        suggestedParams: params,
+        returns: { type: 'void' }
       });
 
-      // Send transaction
-      const txnId = await signAndSendTransaction(appCallTxn, senderAddress);
+      // Calculate box references - now we know exactly which boxes we need:
+      // 1. bets box - to read and update the bet (already have betsBoxName)
+      // 2. events box - for the specific event this bet belongs to
+      const eventsPrefix = new Uint8Array(Buffer.from('events', 'utf-8'));
+      const eventIdBytesForBox = algosdk.encodeUint64(eventId);
+      const eventBoxName = new Uint8Array(eventsPrefix.length + eventIdBytesForBox.length);
+      eventBoxName.set(eventsPrefix, 0);
+      eventBoxName.set(eventIdBytesForBox, eventsPrefix.length);
+
+      // Create atomic transaction composer
+      const atc = new algosdk.AtomicTransactionComposer();
+
+      // Add method call to composer
+      atc.addMethodCall({
+        appID: PREDICTION_MARKET_APP_ID,
+        method: claimWinningsMethod,
+        methodArgs: [betId],
+        sender: senderAddress,
+        suggestedParams: params,
+        signer: algosdk.makeEmptyTransactionSigner(),
+        boxes: [
+          { appIndex: PREDICTION_MARKET_APP_ID, name: betsBoxName },
+          { appIndex: PREDICTION_MARKET_APP_ID, name: eventBoxName },
+        ],
+      });
+
+      // Get the transaction group
+      const txnGroup = atc.buildGroup();
+      const txns = txnGroup.map(tx => tx.txn);
+      
+      // Sign transactions
+      let signedTxns: Uint8Array[];
+      
+      const network = import.meta.env.VITE_ALGORAND_NETWORK || 'localnet';
+      
+      if (network === 'localnet') {
+        // LocalNet: Sign with mnemonic
+        const { LOCALNET_ACCOUNTS } = await import('@/lib/localnet-accounts');
+        const account = LOCALNET_ACCOUNTS.find(acc => acc.address === senderAddress);
+        
+        if (!account) {
+          throw new Error(`LocalNet account not found for address: ${senderAddress}`);
+        }
+        
+        const signerAccount = algosdk.mnemonicToSecretKey(account.mnemonic);
+        console.log('🔑 Claiming winnings with account:', account.name);
+        signedTxns = txns.map(txn => txn.signTxn(signerAccount.sk));
+      } else {
+        // TestNet/MainNet: Use Pera Wallet
+        const wallet = getPeraWallet();
+        const txnsToSign = txns.map(txn => ({ txn, signers: [senderAddress] }));
+        signedTxns = await wallet.signTransaction([txnsToSign]);
+      }
+
+      // Send to network
+      const algodClientForSend = createAlgodClient();
+      const { txid: txnId } = await algodClientForSend.sendRawTransaction(signedTxns).do();
+
+      console.log('✅ Claim winnings transaction sent:', txnId);
 
       // Wait for confirmation
       await waitForConfirmation(txnId);
@@ -822,7 +900,7 @@ export function useAccountBalance(address: string | null) {
       try {
         const algodClient = createAlgodClient();
         const accountInfo = await algodClient.accountInformation(address).do();
-        const balanceInAlgo = accountInfo.amount / 1_000_000;
+        const balanceInAlgo = Number(accountInfo.amount) / 1_000_000;
         setBalance(balanceInAlgo);
       } catch (err) {
         setError(err as Error);

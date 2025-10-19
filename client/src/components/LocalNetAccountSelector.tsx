@@ -67,7 +67,7 @@ export default function LocalNetAccountSelector({
       
       generatedAccounts.push({
         name: `Test Account ${i}`,
-        address: account.addr,
+        address: algosdk.encodeAddress(account.addr.publicKey),
         mnemonic: mnemonic,
         balance: 0, // Not funded yet
       });

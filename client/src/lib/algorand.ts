@@ -198,7 +198,7 @@ export async function getAccountBalance(address: string): Promise<number> {
   const algodClient = createAlgodClient();
   try {
     const accountInfo = await algodClient.accountInformation(address).do();
-    return accountInfo.amount;
+    return Number(accountInfo.amount); // Convert BigInt to Number
   } catch (error) {
     console.error('Failed to get account balance:', error);
     return 0;
@@ -209,7 +209,8 @@ export async function getAccountBalance(address: string): Promise<number> {
  * Get app account address
  */
 export function getAppAddress(appId: number): string {
-  return algosdk.getApplicationAddress(appId);
+  const addr = algosdk.getApplicationAddress(appId);
+  return algosdk.encodeAddress(addr.publicKey);
 }
 
 /**
@@ -220,7 +221,8 @@ export async function waitForConfirmation(
   timeout: number = 10
 ): Promise<algosdk.modelsv2.PendingTransactionResponse> {
   const algodClient = createAlgodClient();
-  const startRound = (await algodClient.status().do())['last-round'];
+  const statusResponse = await algodClient.status().do();
+  const startRound = Number(statusResponse.lastRound);
   let currentRound = startRound;
 
   while (currentRound < startRound + timeout) {
@@ -229,12 +231,12 @@ export async function waitForConfirmation(
         .pendingTransactionInformation(txId)
         .do();
       
-      if (pendingInfo['confirmed-round']) {
+      if (pendingInfo.confirmedRound) {
         return pendingInfo;
       }
       
-      if (pendingInfo['pool-error']) {
-        throw new Error(`Transaction error: ${pendingInfo['pool-error']}`);
+      if (pendingInfo.poolError) {
+        throw new Error(`Transaction error: ${pendingInfo.poolError}`);
       }
       
       await algodClient.statusAfterBlock(currentRound).do();
@@ -279,9 +281,14 @@ export async function signAndSendTransactionGroup(
     // Convert mnemonic to account
     const signerAccount = algosdk.mnemonicToSecretKey(account.mnemonic);
     
+    // Get address as string (algosdk v3 returns Address objects)
+    const signerAddr = typeof signerAccount.addr === 'string' 
+      ? signerAccount.addr 
+      : algosdk.encodeAddress(signerAccount.addr.publicKey);
+    
     // Verify the address matches
-    if (signerAccount.addr !== signerAddress) {
-      throw new Error(`Mnemonic derivation mismatch. Expected ${signerAddress}, got ${signerAccount.addr}`);
+    if (signerAddr !== signerAddress) {
+      throw new Error(`Mnemonic derivation mismatch. Expected ${signerAddress}, got ${signerAddr}`);
     }
     
     // Sign each transaction
@@ -306,7 +313,8 @@ export async function signAndSendTransactionGroup(
   }
 
   // Send to network
-  const { txId } = await algodClient.sendRawTransaction(signedTxns).do();
+  const result = await algodClient.sendRawTransaction(signedTxns).do();
+  const txId = result.txid; // algosdk v3 uses lowercase 'txid'
 
   return txId;
 }
@@ -340,17 +348,19 @@ export async function readGlobalState(
     const appInfo = await algodClient.getApplicationByID(appId).do();
     const globalState: Record<string, any> = {};
 
-    if (appInfo.params['global-state']) {
-      for (const item of appInfo.params['global-state']) {
-        const key = Buffer.from(item.key, 'base64').toString();
+    // algosdk v3 uses camelCase 'globalState' instead of hyphenated 'global-state'
+    if (appInfo.params.globalState) {
+      for (const item of appInfo.params.globalState) {
+        // algosdk v3 returns Uint8Array directly, not base64 string
+        const key = new TextDecoder().decode(item.key);
         const value = item.value;
 
         if (value.type === 1) {
-          // bytes
-          globalState[key] = Buffer.from(value.bytes, 'base64');
+          // bytes - algosdk v3 returns Uint8Array directly
+          globalState[key] = value.bytes;
         } else if (value.type === 2) {
           // uint
-          globalState[key] = value.uint;
+          globalState[key] = Number(value.uint); // Convert BigInt to Number
         }
       }
     }
@@ -441,7 +451,7 @@ export async function createMethodCallTxn(
   
   // Create application call transaction
   return algosdk.makeApplicationNoOpTxnFromObject({
-    from: sender,
+    sender: sender, // algosdk v3 uses 'sender' instead of 'from'
     appIndex: appId,
     appArgs: [method.getSelector(), ...args],
     suggestedParams: params,

@@ -15,7 +15,7 @@ const formatAlgo = (microAlgos: bigint): string => {
 };
 
 interface HomePageProps {
-  walletAddress?: `0x${string}`;
+  walletAddress?: string;
 }
 
 type EventStatus = "OPEN" | "CLOSED" | "RESOLVED";

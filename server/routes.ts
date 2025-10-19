@@ -137,9 +137,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   const getGlobalStateValue = (globalState: any[], key: string): number => {
     for (const item of globalState) {
-      const decodedKey = Buffer.from(item.key, 'base64').toString();
+      // In algosdk v3, item.key is a Uint8Array, not a base64 string
+      const decodedKey = new TextDecoder().decode(item.key);
       if (decodedKey === key) {
-        return item.value.uint || 0;
+        // item.value.uint returns BigInt in v3, convert to number
+        return Number(item.value.uint) || 0;
       }
     }
     return 0;
@@ -173,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw fetchErr;
       }
       
-      const globalState = appInfo.params['global-state'] || [];
+      const globalState = appInfo.params.globalState || [];
       
       // Get event counter from global state
       const eventCounter = getGlobalStateValue(globalState, 'event_counter');
