@@ -12,6 +12,7 @@
 
 ---
 ## DEMO VIDEO : https://m.youtube.com/watch?v=kjgx7n%E2%80%94scq&feature=youtu.be
+## CODE OVERVIEW VIDEO https://youtu.be/6d1tBbY2YwE
 ##  What It Does
 
 A trustless prediction market where users bet ALGO on startup funding outcomes:
