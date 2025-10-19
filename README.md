@@ -1,4 +1,4 @@
-﻿# FoundersNet 
+# FoundersNet 
 
 > **Decentralized prediction markets on Algorand - bet on startup success with blockchain transparency**
 
@@ -11,7 +11,8 @@
 ** Smart Contract:** Algorand ARC-4 (Python  TEAL)
 
 ---
-
+## DEMO VIDEO : https://m.youtube.com/watch?v=kjgx7n%E2%80%94scq&feature=youtu.be
+## CODE OVERVIEW VIDEO https://youtu.be/6d1tBbY2YwE
 ##  What It Does
 
 A trustless prediction market where users bet ALGO on startup funding outcomes:
@@ -23,11 +24,44 @@ A trustless prediction market where users bet ALGO on startup funding outcomes:
 
 ---
 
-##  The Problem We Solve
+## Technical Implementation & Algorand Integration
 
-**Centralized prediction markets** require trust in operators who can manipulate outcomes or freeze funds.
+### SDKs and Tools Used
+- **Algorand Python SDK**: Smart contract development and deployment
+- **algosdk 3.0.0**: Frontend blockchain interactions and wallet integration
+- **Pera Wallet Connect**: Secure transaction signing
+- **AlgoKit**: Development and testing framework
 
-**FoundersNet** uses Algorand smart contracts for trustless, transparent, and fair prediction markets anyone can participate in.
+### Key Algorand Features Leveraged
+
+#### 1. Box Storage for Scalability
+Traditional Algorand smart contracts are limited by global state storage. FoundersNet uses Box Storage to:
+- Store unlimited betting events without state constraints
+- Maintain detailed bet history for each user
+- Scale to thousands of concurrent prediction markets
+
+#### 2. ARC-4 ABI Encoding
+- Type-safe smart contract method calls
+- Standardized interface for frontend integration
+- Robust error handling and validation
+
+#### 3. Atomic Transactions
+- Guaranteed consistency between ALGO transfers and bet recording
+- Prevents partial execution failures
+- Enables complex multi-step operations
+
+#### 4. Instant Finality
+- Bets are confirmed in ~4 seconds
+- No waiting for multiple block confirmations
+- Superior user experience compared to other blockchains
+
+### What Makes This Uniquely Possible on Algorand
+
+1. **Cost Efficiency**: Ethereum gas fees would make micro-betting economically unviable
+2. **Scalability**: Box Storage allows unlimited events without performance degradation  
+3. **Developer Experience**: Python SDK enables rapid smart contract development
+4. **Network Performance**: 4-second finality enables real-time betting experiences
+
 
 ---
 
