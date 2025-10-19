@@ -31,6 +31,18 @@ A trustless prediction market where users bet ALGO on startup funding outcomes:
 
 ---
 
+## 📸 Screenshots
+
+### Events Dashboard
+![Events Dashboard](docs/screenshots/Homedashboard.png)
+*Browse active prediction markets and see real-time betting statistics*
+
+### Admin Dashboard
+![Admin Dashboard](docs/screenshots/AdminDashboard.png)
+*Manage events, resolve outcomes, and monitor platform activity*
+
+---
+
 ##  Quick Start
 
 ```bash
