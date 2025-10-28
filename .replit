@@ -4,6 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["python3", "gcc", "gnumake", "pkg-config"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -13,6 +14,11 @@ run = ["npm", "run", "start"]
 [[ports]]
 localPort = 5000
 externalPort = 80
+exposeLocalhost = true
+
+[[ports]]
+localPort = 38875
+externalPort = 3001
 
 [env]
 PORT = "5000"

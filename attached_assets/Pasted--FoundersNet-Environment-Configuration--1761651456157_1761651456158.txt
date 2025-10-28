@@ -1,0 +1,146 @@
+# ==========================================
+# FoundersNet Environment Configuration
+# ==========================================
+# Copy this file to .env and update with your values
+# NEVER commit .env to version control!
+
+# ==========================================
+# SERVER CONFIGURATION
+# ==========================================
+PORT=3010
+NODE_ENV=development
+
+# ==========================================
+# SOLANA NETWORK CONFIGURATION
+# ==========================================
+# Choose one: localnet, devnet, testnet, mainnet-beta
+VITE_SOLANA_NETWORK=localnet
+
+# LocalNet (Development)
+# VITE_SOLANA_RPC_URL=http://localhost:8899
+# VITE_SOLANA_WS_URL=ws://localhost:8900
+
+# DevNet (Testing with free test SOL)
+# VITE_SOLANA_RPC_URL=https://api.devnet.solana.com
+# VITE_SOLANA_WS_URL=wss://api.devnet.solana.com
+
+# TestNet (Pre-production)
+# VITE_SOLANA_RPC_URL=https://api.testnet.solana.com
+# VITE_SOLANA_WS_URL=wss://api.testnet.solana.com
+
+# MainNet (Production)
+# VITE_SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+# VITE_SOLANA_WS_URL=wss://api.mainnet-beta.solana.com
+
+VITE_SOLANA_RPC_URL=http://localhost:8899
+VITE_SOLANA_WS_URL=ws://localhost:8900
+
+# ==========================================
+# SOLANA EXPLORER
+# ==========================================
+# LocalNet
+VITE_SOLANA_EXPLORER_URL=https://explorer.solana.com/?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899
+
+# DevNet
+# VITE_SOLANA_EXPLORER_URL=https://explorer.solana.com/?cluster=devnet
+
+# TestNet
+# VITE_SOLANA_EXPLORER_URL=https://explorer.solana.com/?cluster=testnet
+
+# MainNet
+# VITE_SOLANA_EXPLORER_URL=https://explorer.solana.com
+
+# ==========================================
+# SOLANA COMMITMENT LEVEL
+# ==========================================
+# Options: processed, confirmed, finalized
+VITE_SOLANA_COMMITMENT=processed
+
+# ==========================================
+# SMART CONTRACT CONFIGURATION
+# ==========================================
+# Deploy your contract and update this with the program ID
+# Get from: anchor deploy output or Anchor.toml
+VITE_SOLANA_PROGRAM_ID=Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS
+
+# ==========================================
+# ADMIN CONFIGURATION
+# ==========================================
+# Admin wallet public key (for privileged operations)
+# Get from: solana-keygen pubkey ~/.config/solana/id.json
+# Or from your wallet (Phantom, Solflare, etc.)
+VITE_SOLANA_ADMIN_ADDRESS=Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS
+
+# ==========================================
+# API CONFIGURATION
+# ==========================================
+# Backend API URL
+VITE_API_URL=http://localhost:3010
+
+# ==========================================
+# DATABASE CONFIGURATION (Optional)
+# ==========================================
+# PostgreSQL connection string
+# Format: postgresql://user:password@host:port/database
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/foundersnet
+
+# ==========================================
+# WALLET CONFIGURATION (Optional)
+# ==========================================
+# WalletConnect Project ID (if using WalletConnect)
+# Get from: https://cloud.walletconnect.com
+# VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here
+
+# ==========================================
+# DEVELOPMENT & DEBUGGING
+# ==========================================
+# Enable verbose logging
+VITE_ENABLE_DEBUG_LOGGING=true
+
+# Enable hot reload
+VITE_ENABLE_HOT_RELOAD=true
+
+# Mock wallet for testing (dev only)
+VITE_MOCK_WALLET=false
+
+# ==========================================
+# SECURITY (Production Only)
+# ==========================================
+# SESSION_SECRET=generate-random-secret-here
+# CORS_ORIGIN=https://your-production-domain.com
+# RATE_LIMIT_MAX=100
+# RATE_LIMIT_WINDOW_MS=900000
+
+# ==========================================
+# MONITORING & ANALYTICS (Optional)
+# ==========================================
+# VITE_ANALYTICS_ID=your-analytics-id
+# SENTRY_DSN=your-sentry-dsn
+# LOG_LEVEL=info
+
+# ==========================================
+# QUICK START GUIDES
+# ==========================================
+# 
+# LOCAL DEVELOPMENT:
+# 1. Copy this file: cp .env.example .env
+# 2. Start Solana validator: npm run localnet:start
+# 3. Deploy contracts: npm run deploy:solana:localnet
+# 4. Start dev server: npm run dev
+# 5. Open: http://localhost:3100
+#
+# DEVNET DEPLOYMENT:
+# 1. Set VITE_SOLANA_NETWORK=devnet
+# 2. Update RPC URLs to DevNet endpoints
+# 3. Get test SOL: solana airdrop 2
+# 4. Deploy: npm run deploy:solana:devnet
+# 5. Update VITE_SOLANA_PROGRAM_ID with deployed program ID
+# 6. Update VITE_SOLANA_ADMIN_ADDRESS with your wallet address
+#
+# PRODUCTION:
+# 1. Use environment-specific config
+# 2. Enable security settings
+# 3. Use production RPC endpoints
+# 4. Set up monitoring
+# 5. Never commit .env file!
+#
