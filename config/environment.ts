@@ -15,9 +15,9 @@ export interface EnvironmentConfig {
   readonly nodeEnv: 'development' | 'production' | 'test';
   readonly apiUrl: string;
   
-  // Algorand Network
+  // Solana Network
   readonly network: NetworkType;
-  readonly appId: number;
+  readonly programId: string;
   readonly adminAddress: string;
   
   // Optional
@@ -58,30 +58,31 @@ function parseEnvironment(): EnvironmentConfig {
   };
 
   // Parse network
-  const network = getRequired('network', 'VITE_ALGORAND_NETWORK');
+  const network = getRequired('network', 'VITE_SOLANA_NETWORK');
   if (!isValidNetwork(network)) {
     throw new ConfigValidationError(
-      `Invalid VITE_ALGORAND_NETWORK: "${network}"\n` +
-      `Must be one of: localnet, testnet, mainnet`
+      `Invalid VITE_SOLANA_NETWORK: "${network}"\n` +
+      `Must be one of: solana-localnet, solana-devnet, solana-testnet, solana-mainnet-beta`
     );
   }
 
-  // Parse app ID
-  const appIdStr = getRequired('appId', 'VITE_ALGORAND_APP_ID');
-  const appId = parseInt(appIdStr, 10);
-  if (isNaN(appId) || appId <= 0) {
+  // Parse program ID
+  const programId = getRequired('programId', 'VITE_SOLANA_PROGRAM_ID');
+  // Basic validation for Solana program ID (base58 string, typically 44 characters)
+  if (programId.length < 32 || programId.length > 44) {
     throw new ConfigValidationError(
-      `Invalid VITE_ALGORAND_APP_ID: "${appIdStr}"\n` +
-      `Must be a positive integer.`
+      `Invalid VITE_SOLANA_PROGRAM_ID: "${programId}"\n` +
+      `Must be a valid Solana program ID (base58 encoded public key).`
     );
   }
 
   // Parse admin address (basic validation)
-  const adminAddress = getRequired('adminAddress', 'VITE_ALGORAND_ADMIN_ADDRESS');
-  if (adminAddress.length !== 58) {
+  const adminAddress = getRequired('adminAddress', 'VITE_SOLANA_ADMIN_ADDRESS');
+  // Solana addresses are base58 encoded public keys, typically 32-44 characters
+  if (adminAddress.length < 32 || adminAddress.length > 44) {
     throw new ConfigValidationError(
-      `Invalid VITE_ALGORAND_ADMIN_ADDRESS: "${adminAddress}"\n` +
-      `Algorand addresses must be 58 characters long.`
+      `Invalid VITE_SOLANA_ADMIN_ADDRESS: "${adminAddress}"\n` +
+      `Solana addresses must be valid base58 encoded public keys.`
     );
   }
 
@@ -101,7 +102,7 @@ function parseEnvironment(): EnvironmentConfig {
     nodeEnv: nodeEnv as 'development' | 'production' | 'test',
     apiUrl,
     network,
-    appId,
+    programId,
     adminAddress,
     databaseUrl: getOptional('databaseUrl', 'DATABASE_URL'),
     walletConnectProjectId: getOptional('walletConnectProjectId', 'VITE_WALLETCONNECT_PROJECT_ID'),
@@ -127,7 +128,7 @@ export function getConfig(): EnvironmentConfig {
       console.log('🔧 Configuration loaded:', {
         nodeEnv: config.nodeEnv,
         network: config.network,
-        appId: config.appId,
+        programId: `${config.programId.slice(0, 8)}...${config.programId.slice(-6)}`,
         adminAddress: `${config.adminAddress.slice(0, 8)}...${config.adminAddress.slice(-6)}`,
         apiUrl: config.apiUrl,
       });

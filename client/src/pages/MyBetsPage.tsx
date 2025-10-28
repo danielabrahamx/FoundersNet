@@ -1,20 +1,20 @@
 import MyBetsTable from "@/components/MyBetsTable";
-import { useWalletAddress } from "@/hooks/useAlgorandPredictionMarket";
-import { useGetUserBets, useClaimWinnings } from "@/hooks/useAlgorandPredictionMarket";
+import { useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
+import { useGetUserBets, useClaimWinnings } from "@/hooks/useSolanaPredictionMarket";
 import { useAllEvents } from "@/hooks/useEvents";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo } from "react";
 
-// Helper to format microAlgos to ALGO
-const formatAlgo = (microAlgos: bigint): string => {
-  return (Number(microAlgos) / 1_000_000).toFixed(2);
+// Helper to format lamports to SOL
+const formatSol = (lamports: bigint): string => {
+  return (Number(lamports) / 1_000_000_000).toFixed(4);
 };
 
 export default function MyBetsPage() {
   const address = useWalletAddress();
-  const { data: userBets, isLoading: betsLoading, error, refetch } = useGetUserBets(address);
+  const { bets: userBets, isLoading: betsLoading, error, refetch } = useGetUserBets(address);
   const { data: contractEvents, isLoading: eventsLoading } = useAllEvents();
-  const { claimWinnings, isPending: isClaimPending } = useClaimWinnings();
+  const { execute: claimWinnings, isLoading: isClaimPending } = useClaimWinnings();
   const { toast } = useToast();
 
   const isLoading = betsLoading || eventsLoading;
@@ -35,7 +35,7 @@ export default function MyBetsPage() {
           eventName: `Event ${eventId}`,
           emoji: "❓",
           choice: (bet.outcome ? "YES" : "NO") as "YES" | "NO",
-          amount: parseFloat(formatAlgo(bet.amount)),
+          amount: parseFloat(formatSol(bet.amount)),
           status: "OPEN" as const,
           hasClaimed: bet.claimed,
         };
@@ -59,9 +59,9 @@ export default function MyBetsPage() {
       const isWinner = status === "RESOLVED" && betChoice === eventOutcome;
 
       if (isWinner) {
-        const betAmount = parseFloat(formatAlgo(bet.amount));
-        const totalYesAmount = parseFloat(formatAlgo(event.totalYesAmount));
-        const totalNoAmount = parseFloat(formatAlgo(event.totalNoAmount));
+        const betAmount = parseFloat(formatSol(bet.amount));
+        const totalYesAmount = parseFloat(formatSol(event.totalYesAmount));
+        const totalNoAmount = parseFloat(formatSol(event.totalNoAmount));
         const totalPool = totalYesAmount + totalNoAmount;
         
         if (betChoice === "YES" && totalYesAmount > 0) {
@@ -77,7 +77,7 @@ export default function MyBetsPage() {
         eventName: event.name,
         emoji: "🚀", // Could be extracted from name
         choice: betChoice,
-        amount: parseFloat(formatAlgo(bet.amount)),
+        amount: parseFloat(formatSol(bet.amount)),
         status,
         outcome: event.resolved ? (eventOutcome as "YES" | "NO") : undefined,
         payout: payout ? parseFloat(payout.toFixed(4)) : undefined,
@@ -96,8 +96,19 @@ export default function MyBetsPage() {
       return;
     }
 
+    // Find the bet to get its eventId
+    const bet = userBets?.find((b: any) => Number(b.betId) === betId);
+    if (!bet) {
+      toast({
+        title: "Bet Not Found",
+        description: "Could not find the specified bet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await claimWinnings(betId, address);
+      await claimWinnings(Number(bet.eventId), betId);
       
       toast({
         title: "Winnings Claimed!",
@@ -144,7 +155,7 @@ export default function MyBetsPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold tracking-tight mb-2">My Bets</h1>
           <p className="text-destructive">
-            Error loading bets. Please make sure your wallet is connected to Algorand LocalNet.
+            Error loading bets. Please make sure your wallet is connected to the Solana network.
           </p>
         </div>
       </div>

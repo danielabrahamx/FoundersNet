@@ -7,9 +7,34 @@ import algosdk from 'algosdk';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { APP_SPEC, PredictionMarketFactory } from './PredictionMarketClient.ts';
+import { AlgorandClient } from '@algorandfoundation/algokit-utils/types/algorand-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Convert ARC-56 spec to ARC-4 ABI format that algosdk understands
+function getABIContract() {
+  const methods = APP_SPEC.methods.map(m => ({
+    name: m.name,
+    desc: m.desc || '',
+    args: m.args.map(a => ({
+      type: a.type,
+      name: a.name,
+      desc: a.desc || ''
+    })),
+    returns: { type: m.returns.type, desc: m.returns.desc || '' }
+  }));
+  
+  return new algosdk.ABIContract({
+    name: APP_SPEC.name,
+    desc: APP_SPEC.desc || '',
+    networks: {},
+    methods
+  });
+}
+
+const abiContract = getABIContract();
 
 /**
  * Algorand network configurations
@@ -98,7 +123,7 @@ async function generateFundedAccount(algodClient, fundingAmount = 100_000_000) {
       const params = await algodClient.getTransactionParams().do();
       const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
         sender: dispenser.addr,
-        receiver: account.addr,
+        receiver: algosdk.encodeAddress(account.addr.publicKey),
         amount: fundingAmount,
         suggestedParams: params,
       });
@@ -175,33 +200,31 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
   
   const params = await algodClient.getTransactionParams().do();
   
-  // Define schema
+  // Define schema - CRITICAL: Use the exact values from ARC-56 spec
   const localInts = 0;
   const localBytes = 0;
-  const globalInts = 16;
-  const globalBytes = 8;
+  const globalInts = 2; // admin (stored as bytes), event_counter, bet_counter
+  const globalBytes = 1; // admin address
   
-  // Create application using AtomicTransactionComposer for ARC-4 compatibility
+  // Create application using Atomic Transaction Composer for ARC-4 compatibility
   const atc = new algosdk.AtomicTransactionComposer();
   
-  // Define the create_application method from ABI (ARC-56)
-  const createAppMethod = new algosdk.ABIMethod({
-    name: 'create_application',
-    args: [
-      { type: 'address', name: 'admin' }
-    ],
-    returns: { type: 'void' }
-  });
+  // Get admin address as string
+  const adminAddr = typeof admin.addr === 'string' ? admin.addr : algosdk.encodeAddress(admin.addr.publicKey);
+  const deployerAddr = typeof deployer.addr === 'string' ? deployer.addr : algosdk.encodeAddress(deployer.addr.publicKey);
   
-  // Get the admin address as a string
-  const adminAddr = typeof admin.addr === 'string' ? admin.addr : admin.addr.toString();
+  console.log('📝 Deploying with admin:', adminAddr);
+  console.log('📝 Deployer:', deployerAddr);
   
-  // Add method call to ATC
+  // Get the create_application method from the ABI contract
+  const createMethod = abiContract.methods.find(m => m.name === 'create_application');
+  
+  //Add method call to ATC with proper box references
   atc.addMethodCall({
     appID: 0, // 0 means this is an app creation call
-    method: createAppMethod,
+    method: createMethod,
     methodArgs: [adminAddr],
-    sender: deployer.addr,
+    sender: deployerAddr,
     signer: algosdk.makeBasicAccountTransactionSigner(deployer),
     suggestedParams: params,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
@@ -217,17 +240,24 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
   // Execute the transaction
   const result = await atc.execute(algodClient, 4);
   
-  // Get the app ID from the method result (algosdk v3 uses camelCase: applicationIndex)
+  console.log('✅ ATC execution result txIDs:', result.txIDs);
+  console.log('✅ Method results count:', result.methodResults?.length);
+  console.log('✅ Application Index:', result.methodResults[0]?.txInfo?.applicationIndex);
+  console.log('✅ TxInfo keys:', Object.keys(result.methodResults[0]?.txInfo || {}));
+  
+  // Get the app ID from the method result
   const txInfo = result.methodResults[0]?.txInfo;
+  console.log('🔍 Global State Delta:', txInfo?.globalStateDelta);
+  console.log('🔍 Logs:', txInfo?.logs);
   let appId = txInfo?.applicationIndex;
   
-  // Convert BigInt to Number if needed (algosdk v3 returns BigInt)
+  // Convert BigInt to Number if needed
   if (typeof appId === 'bigint') {
     appId = Number(appId);
   }
   
   if (!appId || typeof appId !== 'number') {
-    throw new Error(`Failed to get application ID from transaction result. App ID: ${appId}, type: ${typeof appId}`);
+    throw new Error(`Failed to get application ID from transaction result`);
   }
   
   console.log(`✅ Smart contract deployed! App ID: ${appId}`);
@@ -235,6 +265,14 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
   
   // Fund the application account with minimum balance
   await fundAccount(algodClient, deployer, appAddress, 1_000_000); // 1 ALGO for MBR
+  
+  // Wait for confirmation and verify global state was set
+  await waitForConfirmation(algodClient, result.txIDs[0]);
+  const verifyState = await algodClient.getApplicationByID(appId).do();
+  console.log('📊 Global state after deployment:');
+  console.log('   params keys:', Object.keys(verifyState.params));
+  console.log('   global-state:', verifyState.params['global-state']);
+  console.log('   globalState:', verifyState.params.globalState);
   
   return { appId, appAddress };
 }
@@ -249,9 +287,13 @@ async function deployPredictionMarket(algodClient, deployer, admin) {
  */
 async function fundAccount(algodClient, sender, recipient, amount) {
   const params = await algodClient.getTransactionParams().do();
+  
+  // Handle Address object from algosdk v3
+  const senderAddr = typeof sender.addr === 'string' ? sender.addr : algosdk.encodeAddress(sender.addr.publicKey);
+  
   const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
-    receiver: recipient, // algosdk v3: use 'receiver' instead of 'to'
+    sender: senderAddr,
+    receiver: recipient,
     amount: amount,
     suggestedParams: params,
   });
@@ -267,50 +309,155 @@ async function fundAccount(algodClient, sender, recipient, amount) {
 }
 
 /**
- * Call an application method
+ * Call an application method using ABI and AtomicTransactionComposer
  * @param {algosdk.Algodv2} algodClient
  * @param {algosdk.Account} sender
  * @param {number} appId
  * @param {string} methodName
  * @param {Array} methodArgs
- * @param {Array<algosdk.Transaction>} additionalTxns - For atomic groups
+ * @param {Array<algosdk.Transaction>} additionalTxns - For atomic groups (e.g., payment transactions)
  * @returns {Promise<object>}
  */
 async function callAppMethod(algodClient, sender, appId, methodName, methodArgs = [], additionalTxns = []) {
   const params = await algodClient.getTransactionParams().do();
   
-  // Encode method name and arguments
-  const appArgs = [
-    new Uint8Array(Buffer.from(methodName)),
-    ...methodArgs.map(arg => encodeMethodArg(arg)),
-  ];
+  // Get the ABI method from the contract
+  const method = abiContract.getMethodByName(methodName);
   
-  const appCallTxn = algosdk.makeApplicationNoOpTxnFromObject({
-    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
-    suggestedParams: params,
-    appIndex: appId,
-    appArgs: appArgs,
-  });
+  // Create AtomicTransactionComposer
+  const atc = new algosdk.AtomicTransactionComposer();
   
-  let txns = [];
-  let signedTxns = [];
+  // Determine which boxes this method will access
+  // Box storage prefixes from the contract:
+  // - "events" (0x6576656e7473) + uint64
+  // - "bets" (0x62657473) + uint64  
+  // - "user_bets" (0x757365725f62657473) + address
+  // - "event_bets" (0x6576656e745f62657473) + uint64
   
-  if (additionalTxns.length > 0) {
-    // Atomic group with additional transactions
-    txns = [...additionalTxns, appCallTxn];
-    algosdk.assignGroupID(txns);
+  const boxReferences = [];
+  
+  const makeBoxRef = (appIndex, name) => ({ appIndex, name });
+  
+  // For methods that access boxes, we need to specify which ones
+  // The box name is: prefix + key
+  if (methodName === 'create_event') {
+    // Accesses: events box for the new event ID (current counter + 1)
+    // Also accesses event_bets box for initialization
+    // We need to get the current event counter to know the next event ID
+    const eventCounterKey = new TextEncoder().encode('event_counter');
+    const eventCounterValue = await algodClient.getApplicationByID(appId).do();
+    const eventCounter = eventCounterValue.params['global-state']?.find(
+      gs => Buffer.from(gs.key, 'base64').toString() === 'event_counter'
+    )?.value?.uint || 0;
     
-    // Sign all transactions
-    signedTxns = txns.map(txn => txn.signTxn(sender.sk));
-  } else {
-    // Single transaction
-    signedTxns = [appCallTxn.signTxn(sender.sk)];
+    const nextEventId = eventCounter + 1;
+    const eventsPrefix = Buffer.from('events');
+    const eventBetsPrefix = Buffer.from('event_bets');
+    const eventIdBytes = algosdk.encodeUint64(nextEventId);
+    
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([eventsPrefix, eventIdBytes])),
+      makeBoxRef(appId, Buffer.concat([eventBetsPrefix, eventIdBytes]))
+    );
+  } else if (methodName === 'place_bet') {
+    // Accesses: events box, bets box, user_bets box, event_bets box
+    const eventId = typeof methodArgs[0] === 'bigint' ? Number(methodArgs[0]) : methodArgs[0];
+    const eventsPrefix = Buffer.from('events');
+    const betsPrefix = Buffer.from('bets');
+    const userBetsPrefix = Buffer.from('user_bets');
+    const eventBetsPrefix = Buffer.from('event_bets');
+    const eventIdBytes = algosdk.encodeUint64(eventId);
+    
+    // Get current bet counter to know the next bet ID
+    const betCounterValue = await algodClient.getApplicationByID(appId).do();
+    const betCounter = betCounterValue.params['global-state']?.find(
+      gs => Buffer.from(gs.key, 'base64').toString() === 'bet_counter'
+    )?.value?.uint || 0;
+    const nextBetId = betCounter + 1;
+    const betIdBytes = algosdk.encodeUint64(nextBetId);
+    
+    // Handle Address object from algosdk v3
+    const senderAddrString = typeof sender.addr === 'string' ? sender.addr : algosdk.encodeAddress(sender.addr.publicKey);
+    const userAddress = algosdk.decodeAddress(senderAddrString).publicKey;
+    
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([eventsPrefix, eventIdBytes])),
+      makeBoxRef(appId, Buffer.concat([betsPrefix, betIdBytes])),
+      makeBoxRef(appId, Buffer.concat([userBetsPrefix, userAddress])),
+      makeBoxRef(appId, Buffer.concat([eventBetsPrefix, eventIdBytes]))
+    );
+  } else if (methodName === 'resolve_event') {
+    const eventId = typeof methodArgs[0] === 'bigint' ? Number(methodArgs[0]) : methodArgs[0];
+    const eventsPrefix = Buffer.from('events');
+    const eventIdBytes = algosdk.encodeUint64(eventId);
+    
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([eventsPrefix, eventIdBytes]))
+    );
+  } else if (methodName === 'claim_winnings') {
+    const betId = typeof methodArgs[0] === 'bigint' ? Number(methodArgs[0]) : methodArgs[0];
+    const betsPrefix = Buffer.from('bets');
+    const betIdBytes = algosdk.encodeUint64(betId);
+    
+    // Also need the event box for the bet
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([betsPrefix, betIdBytes]))
+    );
+    
+    // We'd need to know the event ID from the bet to add the events box ref
+    // For now, we'll let the contract error guide us if needed
+  } else if (methodName === 'get_event') {
+    const eventId = typeof methodArgs[0] === 'bigint' ? Number(methodArgs[0]) : methodArgs[0];
+    const eventsPrefix = Buffer.from('events');
+    const eventIdBytes = algosdk.encodeUint64(eventId);
+    
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([eventsPrefix, eventIdBytes]))
+    );
+  } else if (methodName === 'get_user_bets') {
+    const userAddress = algosdk.decodeAddress(methodArgs[0]).publicKey;
+    const userBetsPrefix = Buffer.from('user_bets');
+    
+    boxReferences.push(
+      makeBoxRef(appId, Buffer.concat([userBetsPrefix, userAddress]))
+    );
+    
+    // Also need bets boxes for all the user's bets - but we don't know which ones yet
+    // The contract will access them, so we need to be more clever here
   }
   
-  const txId = await algodClient.sendRawTransaction(signedTxns).do();
-  const confirmedTxn = await waitForConfirmation(algodClient, txId.txId);
+  // Add payment transactions first if they exist
+  for (const txn of additionalTxns) {
+    atc.addTransaction({
+      txn: txn,
+      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+    });
+  }
   
-  return confirmedTxn;
+  // Add the method call with box references
+  const senderAddr = typeof sender.addr === 'string' ? sender.addr : algosdk.encodeAddress(sender.addr.publicKey);
+  
+  atc.addMethodCall({
+    appID: appId,
+    method: method,
+    methodArgs: methodArgs,
+    sender: senderAddr,
+    suggestedParams: params,
+    signer: algosdk.makeBasicAccountTransactionSigner(sender),
+    boxes: boxReferences.length > 0 ? boxReferences : undefined
+  });
+  
+  // Execute the transaction group
+  const result = await atc.execute(algodClient, 4);
+  
+  // Wait for confirmation
+  const txId = result.txIDs[result.txIDs.length - 1]; // Last transaction is the method call
+  const confirmedTxn = await waitForConfirmation(algodClient, txId);
+  
+  return {
+    ...confirmedTxn,
+    returnValue: result.methodResults[result.methodResults.length - 1].returnValue,
+  };
 }
 
 /**
@@ -323,9 +470,13 @@ async function callAppMethod(algodClient, sender, appId, methodName, methodArgs 
  */
 async function createPaymentTxn(algodClient, sender, receiver, amount) {
   const params = await algodClient.getTransactionParams().do();
+  
+  // Handle Address object from algosdk v3
+  const senderAddr = typeof sender.addr === 'string' ? sender.addr : algosdk.encodeAddress(sender.addr.publicKey);
+  
   return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender: sender.addr, // algosdk v3: use 'sender' instead of 'from'
-    receiver: receiver, // algosdk v3: use 'receiver' instead of 'to'
+    sender: senderAddr,
+    receiver: receiver,
     amount: amount,
     suggestedParams: params,
   });
@@ -359,21 +510,34 @@ async function readGlobalState(algodClient, appId) {
   const appInfo = await algodClient.getApplicationByID(appId).do();
   const globalState = {};
   
-  if (appInfo.params['global-state']) {
-    for (const item of appInfo.params['global-state']) {
-      const key = Buffer.from(item.key, 'base64').toString();
-      let value;
-      
-      if (item.value.type === 1) {
-        // Bytes
-        value = Buffer.from(item.value.bytes, 'base64').toString();
+  console.log('DEBUG appInfo keys:', Object.keys(appInfo));
+  console.log('DEBUG appInfo.params keys:', appInfo.params ? Object.keys(appInfo.params) : 'no params');
+  
+  // algosdk v3 uses camelCase: globalState, NOT hyphenated global-state
+  const stateArray = appInfo.params?.globalState || appInfo.globalState || [];
+  
+  console.log('DEBUG stateArray length:', stateArray.length);
+  
+  for (const item of stateArray) {
+    const key = Buffer.from(item.key, 'base64').toString();
+    let value;
+    
+    if (item.value.type === 1) {
+      // Bytes - could be address or string
+      const bytes = Buffer.from(item.value.bytes, 'base64');
+      // Check if it's an address (32 bytes)
+      if (bytes.length === 32) {
+        value = bytes; // Keep as buffer for address decoding
       } else {
-        // Uint
-        value = item.value.uint;
+        value = bytes.toString();
       }
-      
-      globalState[key] = value;
+    } else {
+      // Uint - algosdk v3 may return BigInt
+      value = typeof item.value.uint === 'bigint' ? Number(item.value.uint) : item.value.uint;
     }
+    
+    console.log('DEBUG global state key:', key, 'value type:', typeof value);
+    globalState[key] = value;
   }
   
   return globalState;

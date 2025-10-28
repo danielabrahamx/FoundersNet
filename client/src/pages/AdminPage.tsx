@@ -3,21 +3,21 @@ import AdminEventsTable from "@/components/AdminEventsTable";
 import AdminWalletTracker from "@/components/AdminWalletTracker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { useWalletAddress } from "@/hooks/useAlgorandPredictionMarket";
-import { useResolveEvent, useCreateEvent } from "@/hooks/useAlgorandPredictionMarket";
+import { useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
+import { useResolveEvent, useCreateEvent } from "@/hooks/useSolanaPredictionMarket";
 import { useAllEvents } from "@/hooks/useEvents";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
-// Helper to format microAlgos to ALGO
-const formatAlgo = (microAlgos: bigint): string => {
-  return (Number(microAlgos) / 1_000_000).toFixed(2);
+// Helper to format lamports to SOL
+const formatSol = (lamports: bigint): string => {
+  return (Number(lamports) / 1_000_000_000).toFixed(4);
 };
 
 // Get admin address from environment or config
-const ADMIN_ADDRESS = import.meta.env.VITE_ALGORAND_ADMIN_ADDRESS || '';
+const ADMIN_ADDRESS = import.meta.env.VITE_SOLANA_ADMIN_ADDRESS || '';
 
 type EventStatus = "OPEN" | "CLOSED" | "RESOLVED";
 
@@ -36,8 +36,8 @@ interface AdminEvent {
 
 export default function AdminPage() {
   const address = useWalletAddress();
-  const { resolveEvent, isPending: isResolvePending } = useResolveEvent();
-  const { createEvent, isPending: isCreatePending } = useCreateEvent();
+  const { execute: resolveEvent, isLoading: isResolvePending } = useResolveEvent();
+  const { execute: createEvent, isLoading: isCreatePending } = useCreateEvent();
   const { toast } = useToast();
   const { data: contractEvents, isLoading, error } = useAllEvents();
 

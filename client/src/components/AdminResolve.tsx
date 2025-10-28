@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useResolveEvent, useWalletAddress } from '@/hooks/useAlgorandPredictionMarket';
+import { useResolveEvent, useWalletAddress } from '@/hooks/useSolanaPredictionMarket';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 // Admin address from environment
-const ADMIN_ADDRESS = import.meta.env.VITE_ALGORAND_ADMIN_ADDRESS || '';
+const ADMIN_ADDRESS = import.meta.env.VITE_SOLANA_ADMIN_ADDRESS || '';
 
 interface AdminResolveProps {
   eventId: number;
@@ -45,14 +45,14 @@ export function AdminResolve({
 }: AdminResolveProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<boolean | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
   const address = useWalletAddress();
   const { toast } = useToast();
 
-  // Algorand hooks for contract interaction
+  // Solana hooks for contract interaction
   const { 
-    resolveEvent,
-    isPending, 
-    isSuccess,
+    execute: resolveEvent,
+    isLoading, 
     error
   } = useResolveEvent();
 
@@ -98,22 +98,25 @@ export function AdminResolve({
     if (selectedOutcome === null || !address) return;
 
     try {
-      console.log('🎯 Resolving event:', { eventId, outcome: selectedOutcome, senderAddress: address });
-      await resolveEvent(eventId, selectedOutcome, address);
+      console.log('🎯 Resolving event:', { eventId, outcome: selectedOutcome });
+      const signature = await resolveEvent(eventId, selectedOutcome);
 
-      setShowConfirmDialog(false);
-      
-      toast({
-        title: "Event Resolved Successfully!",
-        description: `Event "${eventName}" has been resolved as ${selectedOutcome ? 'YES' : 'NO'}.`,
-      });
-      
-      setSelectedOutcome(null);
-      
-      // Reload page after short delay to refresh data
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      if (signature) {
+        setShowConfirmDialog(false);
+        setIsSuccess(true);
+        
+        toast({
+          title: "Event Resolved Successfully!",
+          description: `Event "${eventName}" has been resolved as ${selectedOutcome ? 'YES' : 'NO'}.`,
+        });
+        
+        setSelectedOutcome(null);
+        
+        // Reload page after short delay to refresh data
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
     } catch (err) {
       console.error('Error resolving event:', err);
       toast({
@@ -179,7 +182,7 @@ export function AdminResolve({
                   {totalYesBets.toString()} bets
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {Number(totalYesAmount).toFixed(2)} ALGO
+                  {Number(totalYesAmount).toFixed(2)} SOL
                 </p>
               </div>
             </div>
@@ -190,7 +193,7 @@ export function AdminResolve({
                   {totalNoBets.toString()} bets
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {Number(totalNoAmount).toFixed(2)} ALGO
+                  {Number(totalNoAmount).toFixed(2)} SOL
                 </p>
               </div>
             </div>
@@ -198,7 +201,7 @@ export function AdminResolve({
 
           <div className="p-4 bg-primary/5 rounded-lg">
             <p className="text-sm font-semibold">Total Pool</p>
-            <p className="text-2xl font-bold">{totalPool.toFixed(2)} ALGO</p>
+            <p className="text-2xl font-bold">{totalPool.toFixed(2)} SOL</p>
             <p className="text-xs text-muted-foreground mt-1">{totalBets} total bets</p>
           </div>
 
@@ -206,10 +209,10 @@ export function AdminResolve({
           <div className="grid grid-cols-2 gap-4">
             <Button
               onClick={() => handleResolveClick(true)}
-              disabled={!isAdmin || isResolved || !hasEnded || isPending}
+              disabled={!isAdmin || isResolved || !hasEnded || isLoading}
               className="h-auto py-6 flex flex-col gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending ? (
+              {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
               ) : (
                 <TrendingUp className="h-6 w-6" />
@@ -220,10 +223,10 @@ export function AdminResolve({
 
             <Button
               onClick={() => handleResolveClick(false)}
-              disabled={!isAdmin || isResolved || !hasEnded || isPending}
+              disabled={!isAdmin || isResolved || !hasEnded || isLoading}
               className="h-auto py-6 flex flex-col gap-2 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending ? (
+              {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
               ) : (
                 <TrendingDown className="h-6 w-6" />
@@ -234,7 +237,7 @@ export function AdminResolve({
           </div>
 
           {/* Status Messages */}
-          {isPending && (
+          {isLoading && (
             <Alert>
               <Loader2 className="h-4 w-4 animate-spin" />
               <AlertDescription>

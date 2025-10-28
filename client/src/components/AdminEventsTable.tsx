@@ -86,7 +86,7 @@ export default function AdminEventsTable({ events, onResolve }: AdminEventsTable
                     </div>
                     <span className="text-muted-foreground">•</span>
                   <span className="text-xs text-muted-foreground">
-                      {(event.yesBets + event.noBets) * 10} ALGO
+                      {(event.yesBets + event.noBets) * 10} SOL
                     </span>
                   </div>
                 </div>

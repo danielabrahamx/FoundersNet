@@ -1,80 +1,57 @@
 /**
  * Network Configuration
- * 
- * Centralized network configuration for Algorand networks.
+ *
+ * Centralized network configuration for Solana networks.
  * Follows Single Responsibility Principle - only handles network config.
+ * Complete migration from Algorand to Solana - Phase 3.
  */
 
-export type NetworkType = 'localnet' | 'testnet' | 'mainnet';
+export type NetworkType = 'solana-localnet' | 'solana-devnet' | 'solana-testnet' | 'solana-mainnet-beta';
 
 export interface NetworkConfig {
   readonly name: string;
-  readonly algod: {
-    readonly url: string;
-    readonly port: number;
-    readonly token: string;
-  };
-  readonly indexer: {
-    readonly url: string;
-    readonly port: number;
-  };
-  readonly explorer: {
-    readonly url: string;
-  };
-  readonly chainId: number;
+  readonly rpcUrl: string;
+  readonly wsUrl?: string;
+  readonly explorerUrl: string;
+  readonly cluster: string;
+  readonly commitment: 'processed' | 'confirmed' | 'finalized';
 }
 
 /**
  * Immutable network configurations
  */
 export const NETWORK_CONFIGS: Readonly<Record<NetworkType, NetworkConfig>> = {
-  localnet: {
-    name: 'LocalNet',
-    algod: {
-      url: 'http://localhost',
-      port: 4001,
-      token: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    },
-    indexer: {
-      url: 'http://localhost',
-      port: 8980,
-    },
-    explorer: {
-      url: 'http://localhost:8980',
-    },
-    chainId: 1337, // Local development
+  'solana-localnet': {
+    name: 'Solana LocalNet',
+    rpcUrl: 'http://localhost:8899',
+    wsUrl: 'ws://localhost:8900',
+    explorerUrl: 'https://explorer.solana.com/?cluster=custom&customUrl=http://localhost:8899',
+    cluster: 'localnet',
+    commitment: 'confirmed',
   },
-  testnet: {
-    name: 'TestNet',
-    algod: {
-      url: 'https://testnet-api.algonode.cloud',
-      port: 443,
-      token: '',
-    },
-    indexer: {
-      url: 'https://testnet-idx.algonode.cloud',
-      port: 443,
-    },
-    explorer: {
-      url: 'https://testnet.algoexplorer.io',
-    },
-    chainId: 416002, // TestNet
+  'solana-devnet': {
+    name: 'Solana DevNet',
+    rpcUrl: 'https://api.devnet.solana.com',
+    wsUrl: 'wss://api.devnet.solana.com',
+    explorerUrl: 'https://explorer.solana.com/?cluster=devnet',
+    cluster: 'devnet',
+    commitment: 'confirmed',
   },
-  mainnet: {
-    name: 'MainNet',
-    algod: {
-      url: 'https://mainnet-api.algonode.cloud',
-      port: 443,
-      token: '',
-    },
-    indexer: {
-      url: 'https://mainnet-idx.algonode.cloud',
-      port: 443,
-    },
-    explorer: {
-      url: 'https://algoexplorer.io',
-    },
-    chainId: 416001, // MainNet
+  'solana-testnet': {
+    name: 'Solana TestNet',
+    rpcUrl: 'https://api.testnet.solana.com',
+    wsUrl: 'wss://api.testnet.solana.com',
+    explorerUrl: 'https://explorer.solana.com/?cluster=testnet',
+    cluster: 'testnet',
+    commitment: 'confirmed',
+  },
+  'solana-mainnet-beta': {
+    name: 'Solana MainNet Beta',
+    rpcUrl: 'https://api.mainnet-beta.solana.com',
+    wsUrl: 'wss://api.mainnet-beta.solana.com',
+    explorerUrl: 'https://explorer.solana.com',
+    cluster: 'mainnet-beta',
+    commitment: 'finalized',
   },
 } as const;
 

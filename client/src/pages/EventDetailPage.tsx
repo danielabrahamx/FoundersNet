@@ -1,12 +1,12 @@
 /**
- * Example Event Detail Page
+ * Event Detail Page
  * 
- * This page demonstrates how to integrate the PlaceBet and AdminResolve components
- * with Wagmi hooks for smart contract interaction on Polygon Amoy testnet.
+ * Displays detailed information about a specific prediction market event
+ * with betting interface and admin controls for Solana blockchain.
  */
 
 import { useParams } from 'wouter';
-import { useAccount } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { PlaceBet } from '@/components/PlaceBet';
 import { AdminResolve } from '@/components/AdminResolve';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,12 +17,13 @@ import CountdownTimer from '@/components/CountdownTimer';
 import EventStatusBadge from '@/components/EventStatusBadge';
 
 // Get admin address from environment
-const ADMIN_ADDRESS = import.meta.env.VITE_ALGORAND_ADMIN_ADDRESS || "";
+const ADMIN_ADDRESS = import.meta.env.VITE_SOLANA_ADMIN_ADDRESS || "";
 
 export default function EventDetailPage() {
   const params = useParams();
   const eventId = params.id ? parseInt(params.id) : 0;
-  const { address, isConnected } = useAccount();
+  const { publicKey, connected } = useWallet();
+  const address = publicKey?.toBase58() || null;
 
   // Fetch event data from the smart contract
   const { data: event, isLoading, error } = useEvent(eventId);
@@ -51,7 +52,7 @@ export default function EventDetailPage() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load event data. Please make sure you're connected to Algorand LocalNet with Pera Wallet.
+            Failed to load event data. Please make sure you're connected to Solana network.
           </AlertDescription>
         </Alert>
       </div>
@@ -137,7 +138,7 @@ export default function EventDetailPage() {
         </Card>
 
         {/* Connection Warning */}
-        {!isConnected && (
+        {!connected && (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -147,7 +148,7 @@ export default function EventDetailPage() {
         )}
 
         {/* Place Bet Component - Available to all connected users */}
-        {isConnected && !isAdmin && (
+        {connected && !isAdmin && (
           <PlaceBet
             eventId={eventId}
             eventName={eventData.name}
@@ -159,7 +160,7 @@ export default function EventDetailPage() {
         )}
 
         {/* Admin Resolution Component - Only for admin */}
-        {isConnected && isAdmin && (
+        {connected && isAdmin && (
           <div className="space-y-6">
             <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950">
               <AlertDescription className="text-amber-800 dark:text-amber-200">

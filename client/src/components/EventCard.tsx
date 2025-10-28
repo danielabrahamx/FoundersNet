@@ -95,8 +95,8 @@ export default function EventCard({
           </div>
 
           <div className="flex items-center justify-between text-sm font-mono">
-            <span className="text-bet-yes" data-testid="text-yes-pool">{totalYesPool} ALGO</span>
-            <span className="text-bet-no" data-testid="text-no-pool">{totalNoPool} ALGO</span>
+            <span className="text-bet-yes" data-testid="text-yes-pool">{totalYesPool} SOL</span>
+            <span className="text-bet-no" data-testid="text-no-pool">{totalNoPool} SOL</span>
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function EventCard({
 
         {status === "OPEN" && !userBet && (
           <Button className="w-full" onClick={onPlaceBet} data-testid="button-place-bet">
-            Place Bet (10 ALGO)
+            Place Bet (10 SOL)
           </Button>
         )}
 

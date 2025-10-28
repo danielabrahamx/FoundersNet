@@ -54,7 +54,7 @@ export default function MyBetsTable({ bets, onClaim }: MyBetsTableProps) {
                       {bet.choice}
                     </span>
                     <span className="text-muted-foreground">•</span>
-                    <span className="font-mono text-muted-foreground" data-testid="text-bet-amount">{bet.amount} ALGO</span>
+                    <span className="font-mono text-muted-foreground" data-testid="text-bet-amount">{bet.amount} SOL</span>
                   </div>
                 </div>
               </div>
@@ -64,7 +64,7 @@ export default function MyBetsTable({ bets, onClaim }: MyBetsTableProps) {
                 
                 {isWinner && !bet.hasClaimed && onClaim && (
                   <Button size="sm" onClick={() => onClaim(bet.id)} data-testid={`button-claim-${bet.id}`}>
-                    Claim {bet.payout} ALGO
+                    Claim {bet.payout} SOL
                   </Button>
                 )}
 

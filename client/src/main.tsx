@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import AlgorandApp from "./AlgorandApp";
+import SolanaApp from "./SolanaApp";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(<AlgorandApp />);
+createRoot(document.getElementById("root")!).render(<SolanaApp />);

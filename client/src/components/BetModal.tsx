@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePlaceBet, useWalletAddress } from "@/hooks/useAlgorandPredictionMarket";
+import { usePlaceBet, useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
 import { useToast } from "@/hooks/use-toast";
 
 interface BetModalProps {
@@ -24,7 +24,7 @@ export default function BetModal({
   noBets,
 }: BetModalProps) {
   const [choice, setChoice] = useState<"YES" | "NO" | null>(null);
-  const { placeBet, isPending, isSuccess, error } = usePlaceBet();
+  const { execute: placeBet, isLoading, error } = usePlaceBet();
   const walletAddress = useWalletAddress();
   const { toast } = useToast();
 
@@ -39,7 +39,7 @@ export default function BetModal({
     if (!choice || !walletAddress) {
       toast({
         title: "Wallet Not Connected",
-        description: "Please connect your wallet to place a bet.",
+        description: "Please connect your Solana wallet to place a bet.",
         variant: "destructive",
       });
       return;
@@ -53,16 +53,20 @@ export default function BetModal({
         throw new Error(`Invalid event ID: ${eventId} (type: ${typeof eventId})`);
       }
 
-      // Place bet on Algorand - amount in ALGO (will be converted to microALGO internally)
-      const betAmount = 10; // 10 ALGO fixed bet amount
-      await placeBet(eventId, choice === "YES", betAmount, walletAddress);
+      // Place bet on Solana - amount in SOL (will be converted to lamports internally)
+      const betAmount = 10; // 10 SOL fixed bet amount
+      const outcome = choice === "YES"; // true = YES, false = NO
       
-      toast({
-        title: "Bet Placed Successfully!",
-        description: `Your ${choice} bet of ${betAmount} ALGO has been placed.`,
-      });
-      setChoice(null);
-      onClose();
+      const signature = await placeBet(eventId, outcome, betAmount);
+      
+      if (signature) {
+        toast({
+          title: "Bet Placed Successfully!",
+          description: `Your ${choice} bet of ${betAmount} SOL has been placed.`,
+        });
+        setChoice(null);
+        onClose();
+      }
     } catch (err) {
       console.error('Error placing bet:', err);
       toast({
@@ -89,13 +93,13 @@ export default function BetModal({
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setChoice("YES")}
-              disabled={isPending}
+              disabled={isLoading}
               className={cn(
                 "p-6 rounded-lg border-2 transition-all hover-elevate",
                 choice === "YES"
                   ? "border-bet-yes bg-bet-yes/10"
                   : "border-border hover:border-bet-yes/50",
-                isPending && "opacity-50 cursor-not-allowed"
+                isLoading && "opacity-50 cursor-not-allowed"
               )}
               data-testid="button-choice-yes"
             >
@@ -112,13 +116,13 @@ export default function BetModal({
 
             <button
               onClick={() => setChoice("NO")}
-              disabled={isPending}
+              disabled={isLoading}
               className={cn(
                 "p-6 rounded-lg border-2 transition-all hover-elevate",
                 choice === "NO"
                   ? "border-bet-no bg-bet-no/10"
                   : "border-border hover:border-bet-no/50",
-                isPending && "opacity-50 cursor-not-allowed"
+                isLoading && "opacity-50 cursor-not-allowed"
               )}
               data-testid="button-choice-no"
             >
@@ -137,15 +141,15 @@ export default function BetModal({
           <div className="space-y-3 p-4 rounded-lg bg-muted/50">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Bet Amount</span>
-              <span className="font-mono font-semibold" data-testid="text-bet-amount">10 ALGO (fixed)</span>
+              <span className="font-mono font-semibold" data-testid="text-bet-amount">10 SOL (fixed)</span>
             </div>
             {choice && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Potential Return</span>
-                <span className="font-mono font-semibold text-primary" data-testid="text-potential-return">~{potentialReturn} ALGO</span>
+                <span className="font-mono font-semibold text-primary" data-testid="text-potential-return">~{potentialReturn} SOL</span>
               </div>
             )}
-            {isPending && (
+            {isLoading && (
               <div className="text-sm text-muted-foreground text-center">
                 Waiting for transaction confirmation...
               </div>
@@ -157,7 +161,7 @@ export default function BetModal({
               variant="outline" 
               className="flex-1" 
               onClick={onClose} 
-              disabled={isPending}
+              disabled={isLoading}
               data-testid="button-cancel"
             >
               Cancel
@@ -165,10 +169,10 @@ export default function BetModal({
             <Button 
               className="flex-1" 
               onClick={handleConfirm}
-              disabled={!choice || isPending}
+              disabled={!choice || isLoading}
               data-testid="button-confirm-bet"
             >
-              {isPending ? "Confirming..." : "Confirm Bet"}
+              {isLoading ? "Confirming..." : "Confirm Bet"}
             </Button>
           </div>
         </div>

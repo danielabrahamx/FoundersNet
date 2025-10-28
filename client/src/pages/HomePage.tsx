@@ -5,49 +5,50 @@ import MockModeBanner from "@/components/MockModeBanner";
 import { Button } from "@/components/ui/button";
 import { Filter, Loader2 } from "lucide-react";
 import { useAllEvents } from "@/hooks/useEvents";
-import { useGetUserBets, useClaimWinnings } from "@/hooks/useAlgorandPredictionMarket";
+import { useGetUserBets, useClaimWinnings, useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-// Helper to format microAlgos to ALGO
-const formatAlgo = (microAlgos: bigint): string => {
-  return (Number(microAlgos) / 1_000_000).toFixed(2);
+// Helper to format lamports to SOL
+const formatSol = (lamports: bigint | number): string => {
+  return (Number(lamports) / 1_000_000_000).toFixed(4);
 };
 
 interface HomePageProps {
-  walletAddress?: string;
+  // No props needed, wallet address comes from hook
 }
 
 type EventStatus = "OPEN" | "CLOSED" | "RESOLVED";
 
 interface ContractEvent {
-  eventId: number;  // Changed from id: bigint to match API response
+  eventId: number;
   name: string;
-  endTime: number;  // Changed from bigint
+  endTime: number;
   resolved: boolean;
   outcome: boolean;
-  totalYesBets: number;  // Changed from bigint
-  totalNoBets: number;  // Changed from bigint
-  totalYesAmount: string;  // Changed from bigint to string (API returns as string)
-  totalNoAmount: string;  // Changed from bigint to string (API returns as string)
+  totalYesBets: number;
+  totalNoBets: number;
+  totalYesAmount: string;
+  totalNoAmount: string;
 }
 
-export default function HomePage({ walletAddress }: HomePageProps) {
+export default function HomePage({}: HomePageProps) {
   const [betModal, setBetModal] = useState<{ open: boolean; event?: ContractEvent }>({
     open: false,
   });
   const [filter, setFilter] = useState<"ALL" | "OPEN" | "CLOSED" | "RESOLVED">("ALL");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const walletAddress = useWalletAddress();
 
   // Fetch all events from contract
   const { data: events, isLoading, error } = useAllEvents();
   
   // Fetch user bets if wallet connected
-  const { data: userBets } = useGetUserBets(walletAddress || null);
+  const { bets: userBets } = useGetUserBets(walletAddress);
   
   // Hook for claiming winnings
-  const { claimWinnings } = useClaimWinnings();
+  const { execute: claimWinnings } = useClaimWinnings();
 
   // Determine event status based on contract data
   const getEventStatus = (event: ContractEvent): EventStatus => {
@@ -107,7 +108,7 @@ export default function HomePage({ walletAddress }: HomePageProps) {
           <div className="flex flex-col items-center gap-4 text-center">
             <p className="text-destructive font-semibold">Error loading events</p>
             <p className="text-sm text-muted-foreground">
-              Please make sure you're connected to Algorand LocalNet with Pera Wallet
+              Please make sure you're connected to Solana devnet with a supported wallet
             </p>
           </div>
         </div>
@@ -122,7 +123,7 @@ export default function HomePage({ walletAddress }: HomePageProps) {
         <div className="mb-8">
           <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
           <p className="text-muted-foreground">
-            Bet on which startups will raise Series A. All bets are on Algorand TestNet.
+            Bet on which startups will raise Series A. All bets are on Solana devnet.
           </p>
         </div>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -168,7 +169,8 @@ export default function HomePage({ walletAddress }: HomePageProps) {
         return;
       }
 
-      await claimWinnings(Number(userBet.betId), walletAddress);
+      // Claim winnings with eventId and betId
+      await claimWinnings(eventId, userBet.betId);
       
       toast({
         title: "Winnings Claimed! 🎉",
@@ -192,7 +194,7 @@ export default function HomePage({ walletAddress }: HomePageProps) {
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
         <p className="text-muted-foreground">
-          Bet on which startups will raise Series A. All bets are on Algorand TestNet.
+          Bet on which startups will raise Series A. All bets are on Solana devnet.
         </p>
       </div>
 
@@ -230,8 +232,8 @@ export default function HomePage({ walletAddress }: HomePageProps) {
               status={status}
               yesBets={Number(event.totalYesBets)}
               noBets={Number(event.totalNoBets)}
-              totalYesPool={parseFloat(event.totalYesAmount) / 1_000_000}
-              totalNoPool={parseFloat(event.totalNoAmount) / 1_000_000}
+              totalYesPool={parseFloat(event.totalYesAmount) / 1_000_000_000}
+              totalNoPool={parseFloat(event.totalNoAmount) / 1_000_000_000}
               userBet={userBetData?.choice}
               outcome={event.resolved ? (event.outcome ? "YES" : "NO") : undefined}
               onPlaceBet={() => setBetModal({ open: true, event })}

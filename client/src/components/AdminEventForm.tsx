@@ -4,28 +4,64 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useCreateEvent } from "@/hooks/useSolanaPredictionMarket";
 
 interface AdminEventFormProps {
-  onSubmit: (data: {
-    name: string;
-    description: string;
-    emoji: string;
-    endTime: string;
-  }) => void;
+  onSuccess?: () => void;
 }
 
-export default function AdminEventForm({ onSubmit }: AdminEventFormProps) {
+export default function AdminEventForm({ onSuccess }: AdminEventFormProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     emoji: "🚀",
     endTime: "",
   });
+  
+  const { execute: createEvent, isLoading } = useCreateEvent();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
-    setFormData({ name: "", description: "", emoji: "🚀", endTime: "" });
+    
+    try {
+      // Convert datetime-local to Unix timestamp
+      const endTimeUnix = Math.floor(new Date(formData.endTime).getTime() / 1000);
+      
+      // Validate end time is in the future
+      const now = Math.floor(Date.now() / 1000);
+      if (endTimeUnix <= now) {
+        toast({
+          title: "Invalid End Time",
+          description: "End time must be in the future.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create event name with emoji
+      const eventName = `${formData.emoji} ${formData.name}`;
+      
+      const signature = await createEvent(eventName, endTimeUnix);
+      
+      if (signature) {
+        // Reset form
+        setFormData({ name: "", description: "", emoji: "🚀", endTime: "" });
+        
+        // Call success callback
+        if (onSuccess) {
+          onSuccess();
+        }
+      }
+    } catch (error) {
+      console.error('Error creating event:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create event",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -84,8 +120,8 @@ export default function AdminEventForm({ onSubmit }: AdminEventFormProps) {
           />
         </div>
 
-        <Button type="submit" className="w-full" data-testid="button-create-event">
-          Create Event
+        <Button type="submit" className="w-full" data-testid="button-create-event" disabled={isLoading}>
+          {isLoading ? "Creating..." : "Create Event"}
         </Button>
       </form>
     </Card>
