@@ -9,7 +9,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./client/src/test/setup.ts'],
-    include: ['client/src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
+    include: [
+      'client/src/**/*.test.{ts,tsx}',
+      'client/src/**/*.spec.{ts,tsx}',
+      'test/**/*.test.{ts,tsx}'
+    ],
     exclude: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/_archive_**/**'],
     coverage: {
       provider: 'v8',
@@ -21,6 +25,8 @@ export default defineConfig({
         '**/*.test.tsx',
       ],
     },
+    testTimeout: 10000,
+    hookTimeout: 10000,
   },
   resolve: {
     alias: {
