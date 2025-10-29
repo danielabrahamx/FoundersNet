@@ -125,13 +125,14 @@ export function useSolanaProgram(): {
   connection: web3.Connection;
   program: Program<PredictionMarket> | null;
   provider: AnchorProvider | null;
+  isReady: boolean;
 } {
   const { connection } = useConnection();
   const wallet = useWallet();
   const service = getSolanaService();
 
   const provider = useMemo(() => {
-    if (!wallet.publicKey) return null;
+    if (!wallet.publicKey || !wallet.signTransaction) return null;
     
     return new AnchorProvider(
       connection,
@@ -148,7 +149,138 @@ export function useSolanaProgram(): {
     }
   }, [service]);
 
-  return { connection, program, provider };
+  // Program is ready when we have program instance
+  // Note: provider is only needed for write operations
+  const isReady = program !== null;
+
+  return { connection, program, provider, isReady };
+}
+
+// ============================================================================
+// Initialize Program Hook
+// ============================================================================
+
+/**
+ * Hook to initialize the program state (admin only, one-time setup)
+ */
+export function useInitializeProgram(): TransactionHookReturn {
+  const { program, provider, isReady } = useSolanaProgram();
+  const { publicKey } = useWallet();
+  const { toast } = useToast();
+  const service = getSolanaService();
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
+
+  const execute = useCallback(async (
+    adminAddress: string
+  ): Promise<string | null> => {
+    if (!isReady || !program || !provider || !publicKey) {
+      const err = new Error('Wallet not connected or program not ready');
+      setError(err);
+      toast({
+        title: 'Error',
+        description: err.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const adminPubkey = new PublicKey(adminAddress);
+      const [programStatePDA] = await service.deriveProgramStatePDA();
+
+      // Initialize the program
+      const tx = await program.methods
+        .initialize(adminPubkey)
+        .accountsPartial({
+          programState: programStatePDA,
+          payer: publicKey,
+        })
+        .rpc();
+
+      setSignature(tx);
+      
+      toast({
+        title: 'Success',
+        description: 'Program initialized successfully!',
+      });
+
+      return tx;
+    } catch (err: any) {
+      const error = err instanceof Error ? err : new Error('Failed to initialize program');
+      setError(error);
+      
+      let description = error.message;
+      if (error.message.includes('already in use')) {
+        description = 'Program is already initialized.';
+      }
+      
+      toast({
+        title: 'Initialization Failed',
+        description,
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [program, provider, publicKey, isReady, service, toast]);
+
+  return { execute, isLoading, error, signature };
+}
+
+/**
+ * Hook to check if program is initialized
+ */
+export function useProgramInitialized(): {
+  isInitialized: boolean | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+} {
+  const { program } = useSolanaProgram();
+  const service = getSolanaService();
+  const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const checkInitialized = useCallback(async () => {
+    if (!program) {
+      setIsInitialized(false);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const [programStatePDA] = await service.deriveProgramStatePDA();
+      await program.account.programState.fetch(programStatePDA);
+      
+      setIsInitialized(true);
+    } catch (err: any) {
+      if (err.message?.includes('Account does not exist')) {
+        setIsInitialized(false);
+      } else {
+        setError(err instanceof Error ? err : new Error('Failed to check initialization'));
+        setIsInitialized(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [program, service]);
+
+  useEffect(() => {
+    checkInitialized();
+  }, [checkInitialized]);
+
+  return { isInitialized, isLoading, error, refetch: checkInitialized };
 }
 
 // ============================================================================
@@ -159,7 +291,7 @@ export function useSolanaProgram(): {
  * Hook to create a new prediction event (admin only)
  */
 export function useCreateEvent(): TransactionHookReturn {
-  const { program, provider } = useSolanaProgram();
+  const { program, provider, isReady } = useSolanaProgram();
   const { publicKey } = useWallet();
   const { toast } = useToast();
   const service = getSolanaService();
@@ -172,11 +304,36 @@ export function useCreateEvent(): TransactionHookReturn {
     name: string,
     endTime: number // Unix timestamp in seconds
   ): Promise<string | null> => {
-    if (!program || !provider || !publicKey) {
-      const err = new Error('Wallet not connected or program not initialized');
+    // Check if program is ready
+    if (!isReady || !program) {
+      const err = new Error('Program not initialized. Please check your deployment.');
       setError(err);
       toast({
-        title: 'Error',
+        title: 'Program Error',
+        description: 'The prediction market program is not initialized. Please contact support.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    // Check wallet connection
+    if (!publicKey) {
+      const err = new Error('Please connect your wallet to create events');
+      setError(err);
+      toast({
+        title: 'Wallet Not Connected',
+        description: err.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    // Check provider (needed for signing)
+    if (!provider) {
+      const err = new Error('Wallet provider not ready. Please try reconnecting your wallet.');
+      setError(err);
+      toast({
+        title: 'Provider Error',
         description: err.message,
         variant: 'destructive',
       });
@@ -191,7 +348,16 @@ export function useCreateEvent(): TransactionHookReturn {
       const [programStatePDA] = await service.deriveProgramStatePDA();
       
       // Fetch current event counter
-      const programState = await program.account.programState.fetch(programStatePDA);
+      let programState;
+      try {
+        programState = await program.account.programState.fetch(programStatePDA);
+      } catch (fetchErr: any) {
+        throw new Error(
+          'Program state not initialized. The smart contract needs to be initialized first. ' +
+          'Please run the initialize instruction or contact the administrator.'
+        );
+      }
+      
       const nextEventId = programState.eventCounter.toNumber() + 1;
 
       // Derive PDAs for new event
@@ -217,19 +383,30 @@ export function useCreateEvent(): TransactionHookReturn {
       });
 
       return tx;
-    } catch (err) {
+    } catch (err: any) {
       const error = err instanceof Error ? err : new Error('Failed to create event');
       setError(error);
+      
+      // Provide more helpful error messages
+      let description = error.message;
+      if (error.message.includes('User rejected')) {
+        description = 'Transaction was cancelled in wallet.';
+      } else if (error.message.includes('insufficient')) {
+        description = 'Insufficient funds to complete transaction. Please add SOL to your wallet.';
+      } else if (error.message.includes('Program state not initialized')) {
+        description = error.message;
+      }
+      
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Failed to Create Event',
+        description,
         variant: 'destructive',
       });
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [program, provider, publicKey, service, toast]);
+  }, [program, provider, publicKey, isReady, service, toast]);
 
   return { execute, isLoading, error, signature };
 }

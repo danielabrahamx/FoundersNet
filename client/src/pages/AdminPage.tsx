@@ -3,12 +3,13 @@ import AdminEventsTable from "@/components/AdminEventsTable";
 import AdminWalletTracker from "@/components/AdminWalletTracker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
-import { useResolveEvent, useCreateEvent } from "@/hooks/useSolanaPredictionMarket";
+import { Button } from "@/components/ui/button";
+import { useWalletAddress, useProgramInitialized, useInitializeProgram } from "@/hooks/useSolanaPredictionMarket";
+import { useResolveEvent } from "@/hooks/useSolanaPredictionMarket";
 import { useAllEvents } from "@/hooks/useEvents";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { useMemo } from "react";
 
 // Helper to format lamports to SOL
@@ -37,7 +38,8 @@ interface AdminEvent {
 export default function AdminPage() {
   const address = useWalletAddress();
   const { execute: resolveEvent, isLoading: isResolvePending } = useResolveEvent();
-  const { execute: createEvent, isLoading: isCreatePending } = useCreateEvent();
+  const { execute: initializeProgram, isLoading: isInitializePending } = useInitializeProgram();
+  const { isInitialized, isLoading: isCheckingInit, refetch: recheckInit } = useProgramInitialized();
   const { toast } = useToast();
   const { data: contractEvents, isLoading, error } = useAllEvents();
 
@@ -82,72 +84,14 @@ export default function AdminPage() {
     const totalEvents = adminEvents.length;
     const totalBets = adminEvents.reduce((acc, e) => acc + e.yesBets + e.noBets, 0);
     const totalPool = adminEvents.reduce((acc, e) => {
-      const yes = Number(formatAlgo(e.totalYesAmount));
-      const no = Number(formatAlgo(e.totalNoAmount));
+      const yes = Number(formatSol(e.totalYesAmount));
+      const no = Number(formatSol(e.totalNoAmount));
       return acc + yes + no;
     }, 0);
     const activeEvents = adminEvents.filter(e => e.status === "OPEN").length;
     
     return { totalEvents, totalBets, totalPool: Math.round(totalPool), activeEvents };
   }, [adminEvents]);
-
-  const handleCreateEvent = async (data: {
-    name: string;
-    description: string;
-    emoji: string;
-    endTime: string;
-  }) => {
-    if (!isAdmin) {
-      toast({
-        title: "Access Denied",
-        description: "Only the admin can create events.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Convert datetime-local to Unix timestamp in seconds
-      const endTimeTimestamp = Math.floor(new Date(data.endTime).getTime() / 1000);
-      const now = Math.floor(Date.now() / 1000);
-
-      // Validate end time is in the future
-      if (endTimeTimestamp <= now) {
-        toast({
-          title: "Invalid Time",
-          description: "Event end time must be in the future.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Format event name with emoji and description
-      const eventName = `${data.emoji} ${data.name} - ${data.description}`;
-
-      if (!address) {
-        toast({
-          title: "Wallet Not Connected",
-          description: "Please connect your wallet to create events.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      await createEvent(eventName, endTimeTimestamp, address);
-      
-      toast({
-        title: "Event Created!",
-        description: `"${data.name}" has been created successfully.`,
-      });
-    } catch (error) {
-      console.error('Error creating event:', error);
-      toast({
-        title: "Creation Failed",
-        description: error instanceof Error ? error.message : "Failed to create event. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleResolve = async (eventId: number, outcome: "YES" | "NO") => {
     console.log('🎯 AdminPage.handleResolve called:', {
@@ -202,6 +146,101 @@ export default function AdminPage() {
       throw error; // Re-throw so AdminEventsTable knows it failed
     }
   };
+
+  const handleInitializeProgram = async () => {
+    if (!address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await initializeProgram(ADMIN_ADDRESS);
+      // Recheck initialization status after a short delay
+      setTimeout(() => recheckInit(), 1000);
+    } catch (error) {
+      console.error('Error initializing program:', error);
+    }
+  };
+
+  // Show loading state while checking initialization
+  if (isCheckingInit) {
+    return (
+      <div className="container mx-auto py-8 space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-lg">Checking program status...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show initialization prompt if program not initialized
+  if (isInitialized === false) {
+    return (
+      <div className="container mx-auto py-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        </div>
+
+        <Alert variant="default" className="border-yellow-500 bg-yellow-500/10">
+          <AlertCircle className="h-4 w-4 text-yellow-500" />
+          <AlertDescription className="text-yellow-500">
+            <div className="space-y-4">
+              <div>
+                <strong>Program Not Initialized</strong>
+                <p className="mt-1">
+                  The prediction market smart contract has not been initialized yet. 
+                  This is a one-time setup that must be completed before creating events or placing bets.
+                </p>
+              </div>
+              
+              {!address && (
+                <p className="text-sm">
+                  Please connect your wallet to initialize the program.
+                </p>
+              )}
+              
+              {address && !isAdmin && (
+                <p className="text-sm">
+                  Only the admin wallet can initialize the program.
+                  <br />
+                  Expected: {ADMIN_ADDRESS}
+                  <br />
+                  Connected: {address}
+                </p>
+              )}
+              
+              {address && isAdmin && (
+                <div>
+                  <p className="text-sm mb-3">
+                    Click the button below to initialize the program with your wallet as admin.
+                  </p>
+                  <Button 
+                    onClick={handleInitializeProgram}
+                    disabled={isInitializePending}
+                    className="bg-yellow-600 hover:bg-yellow-700"
+                  >
+                    {isInitializePending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      'Initialize Program'
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   // Show warning if not admin
   if (!address) {
@@ -258,11 +297,19 @@ export default function AdminPage() {
 
   return (
     <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Dashboard</h1>
-        <p className="text-muted-foreground">
-          Manage events and monitor betting activity
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Admin Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage events and monitor betting activity
+          </p>
+        </div>
+        {isInitialized && (
+          <div className="flex items-center text-green-500">
+            <CheckCircle2 className="h-5 w-5 mr-2" />
+            <span className="text-sm font-medium">Program Active</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -303,9 +350,7 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="create">
-          <AdminEventForm
-            onSubmit={handleCreateEvent}
-          />
+          <AdminEventForm />
         </TabsContent>
       </Tabs>
     </div>
