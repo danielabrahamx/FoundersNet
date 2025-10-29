@@ -116,23 +116,6 @@ export default function HomePage({}: HomePageProps) {
     );
   }
 
-  // Handle no events
-  if (!events || !Array.isArray(events) || events.length === 0) {
-    return (
-      <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Startup Prediction Markets</h1>
-          <p className="text-muted-foreground">
-            Bet on which startups will raise Series A. All bets are on Solana devnet.
-          </p>
-        </div>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <p className="text-muted-foreground">No events available yet.</p>
-        </div>
-      </div>
-    );
-  }
-
   const handlePlaceBet = (choice: "YES" | "NO") => {
     if (betModal.event && walletAddress) {
       console.log('Bet placed:', choice, 'on event', betModal.event.eventId, 'by', walletAddress);
@@ -215,34 +198,40 @@ export default function HomePage({}: HomePageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredEvents.map((event: ContractEvent) => {
-          const status = getEventStatus(event);
-          const userBetData = getUserBetForEvent(event.eventId);
-          const eventId = event.eventId;
+      {events.length === 0 ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-muted-foreground">No events available yet.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredEvents.map((event: ContractEvent) => {
+            const status = getEventStatus(event);
+            const userBetData = getUserBetForEvent(event.eventId);
+            const eventId = event.eventId;
 
-          return (
-            <EventCard
-              key={eventId}
-              id={eventId}
-              emoji="🚀"
-              name={event.name}
-              description={`Event #${eventId}`}
-              endTime={Number(event.endTime)}
-              status={status}
-              yesBets={Number(event.totalYesBets)}
-              noBets={Number(event.totalNoBets)}
-              totalYesPool={parseFloat(event.totalYesAmount) / 1_000_000_000}
-              totalNoPool={parseFloat(event.totalNoAmount) / 1_000_000_000}
-              userBet={userBetData?.choice}
-              outcome={event.resolved ? (event.outcome ? "YES" : "NO") : undefined}
-              onPlaceBet={() => setBetModal({ open: true, event })}
-              onClaim={() => handleClaimPayout(eventId)}
-              hasClaimed={userBetData?.claimed}
-            />
-          );
-        })}
-      </div>
+            return (
+              <EventCard
+                key={eventId}
+                id={eventId}
+                emoji="🚀"
+                name={event.name}
+                description={`Event #${eventId}`}
+                endTime={Number(event.endTime)}
+                status={status}
+                yesBets={Number(event.totalYesBets)}
+                noBets={Number(event.totalNoBets)}
+                totalYesPool={parseFloat(event.totalYesAmount) / 1_000_000_000}
+                totalNoPool={parseFloat(event.totalNoAmount) / 1_000_000_000}
+                userBet={userBetData?.choice}
+                outcome={event.resolved ? (event.outcome ? "YES" : "NO") : undefined}
+                onPlaceBet={() => setBetModal({ open: true, event })}
+                onClaim={() => handleClaimPayout(eventId)}
+                hasClaimed={userBetData?.claimed}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {betModal.event && (
         <BetModal

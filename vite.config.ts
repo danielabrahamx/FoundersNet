@@ -35,14 +35,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3100,
+    port: 8000,
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3010',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },

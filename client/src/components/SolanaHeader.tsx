@@ -69,7 +69,7 @@ function NetworkIndicator({ network }: { network: string }) {
   const displayName = network === 'mainnet-beta' ? 'Mainnet' : network.charAt(0).toUpperCase() + network.slice(1);
 
   return (
-    <div className={cn(
+    <div data-testid="network-indicator" className={cn(
       "hidden sm:flex items-center gap-2 px-3 py-2 rounded-md border",
       getNetworkColor()
     )}>
@@ -116,7 +116,7 @@ export default function SolanaHeader() {
 
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
+                <Link key={item.path} href={item.path} data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}>
                   <span
                     className={cn(
                       "px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate cursor-pointer",
@@ -124,7 +124,6 @@ export default function SolanaHeader() {
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground hover:text-foreground"
                     )}
-                    data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}
                   >
                     {item.label}
                   </span>
