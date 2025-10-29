@@ -231,7 +231,7 @@ npm run build:frontend
 ```bash
 # Development
 npm run dev                    # Start dev servers
-npm run dev:frontend          # Frontend only (port 5173)
+npm run dev:frontend          # Frontend only (port 8000)
 npm run dev:backend           # Backend only (port 5000)
 
 # Building
