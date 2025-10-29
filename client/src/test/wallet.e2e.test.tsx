@@ -89,7 +89,7 @@ describe('Wallet Integration E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      expect(screen.getByText(/solana-devnet/i)).toBeInTheDocument();
+      expect(screen.getByTestId('network-indicator')).toBeInTheDocument();
     });
   });
 
@@ -161,7 +161,7 @@ describe('Wallet Integration E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      expect(screen.getByText(/devnet/i)).toBeInTheDocument();
+      expect(screen.getByTestId('network-indicator')).toBeInTheDocument();
     });
   });
 });

@@ -11,10 +11,10 @@ export default function BetModalExample() {
       <BetModal
         open={open}
         onClose={() => setOpen(false)}
+        eventId={1}
         eventName="TechFlow AI"
         yesBets={45}
         noBets={23}
-        onConfirm={(choice) => console.log('Bet confirmed:', choice)}
       />
     </div>
   );

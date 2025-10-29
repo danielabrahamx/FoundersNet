@@ -12,8 +12,9 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { 
   PhantomWalletAdapter,
   SolflareWalletAdapter,
+  UnsafeBurnerWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
+import { WalletAdapterNetwork, WalletAdapter } from '@solana/wallet-adapter-base';
 import { clusterApiUrl, Connection, PublicKey } from '@solana/web3.js';
 import { getConfig, getNetworkConfig } from '@/../../config';
 
@@ -96,6 +97,7 @@ function SolanaWalletInnerProvider({ children }: SolanaWalletProviderProps) {
 export function SolanaWalletProvider({ children }: SolanaWalletProviderProps) {
   const config = getConfig();
   const networkConfig = getNetworkConfig(config.network);
+  const enableBurner = (import.meta as any).env?.VITE_ENABLE_BURNER === 'true' || config.network === 'solana-localnet';
   
   // Get RPC endpoint
   const endpoint = useMemo(() => {
@@ -103,13 +105,17 @@ export function SolanaWalletProvider({ children }: SolanaWalletProviderProps) {
   }, [networkConfig.rpcUrl]);
   
   // Configure wallets
-  const wallets = useMemo(
-    () => [
+  const wallets = useMemo<WalletAdapter[]>(() => {
+    const base: WalletAdapter[] = [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
-    ],
-    []
-  );
+    ];
+    // Add an in-browser local wallet for local development; never use in production
+    if (enableBurner) {
+      base.unshift(new UnsafeBurnerWalletAdapter());
+    }
+    return base as WalletAdapter[];
+  }, [enableBurner]);
   
   // Auto-connect configuration
   const autoConnect = useMemo(() => {

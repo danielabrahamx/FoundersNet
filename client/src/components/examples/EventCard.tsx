@@ -1,7 +1,7 @@
 import EventCard from '../EventCard';
 
 export default function EventCardExample() {
-  const futureDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const futureTimestamp = Math.floor((Date.now() + 3 * 24 * 60 * 60 * 1000) / 1000);
 
   return (
     <div className="p-4 bg-background max-w-md">
@@ -10,7 +10,7 @@ export default function EventCardExample() {
         emoji="🚀"
         name="TechFlow AI"
         description="AI-powered workflow automation platform targeting SMBs with advanced no-code capabilities"
-        endTime={futureDate}
+        endTime={futureTimestamp}
         status="OPEN"
         yesBets={45}
         noBets={23}

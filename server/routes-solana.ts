@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
 import * as anchor from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Program } from '@coral-xyz/anchor';
@@ -37,6 +36,47 @@ interface Bet {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Demo mode flag (allows running without a live Solana program)
+  const DEMO_MODE = (process.env.DEMO_MODE === 'true') || (process.env.VITE_DEMO_MODE === 'true');
+
+  // In-memory demo state (used only when DEMO_MODE is true)
+  type DemoAccount = { address: string; name: string; balance: string };
+  let demoInitialized = false;
+  let demoAdminAddress = process.env.VITE_SOLANA_ADMIN_ADDRESS || 'DEMOADMIN1111111111111111111111111111111111';
+  let demoAccounts: Record<string, DemoAccount> = {};
+  let demoEvents: Record<number, Event> = {};
+  let demoBets: Bet[] = [];
+  let demoCounters = { event: 0, bet: 0 };
+
+  const LAMPORTS_PER_SOL = BigInt(1000000000);
+  const toLamports = (v: string | number | bigint) => BigInt(v);
+  const fromLamports = (v: bigint) => v.toString();
+
+  const seedDemoState = () => {
+    if (demoInitialized || !DEMO_MODE) return;
+    demoInitialized = true;
+    // Seed accounts with 100 SOL each
+    const seed: DemoAccount[] = [
+      { address: demoAdminAddress, name: 'Admin', balance: (BigInt(100) * LAMPORTS_PER_SOL).toString() },
+      { address: 'Alice111111111111111111111111111111111111111', name: 'Alice', balance: (BigInt(100) * LAMPORTS_PER_SOL).toString() },
+      { address: 'Bob22222222222222222222222222222222222222222', name: 'Bob', balance: (BigInt(100) * LAMPORTS_PER_SOL).toString() },
+      { address: 'Charlie3333333333333333333333333333333333333', name: 'Charlie', balance: (BigInt(100) * LAMPORTS_PER_SOL).toString() },
+    ];
+    demoAccounts = Object.fromEntries(seed.map(a => [a.address, a]));
+
+    // Initialize empty events - users create real startup prediction events
+    demoCounters.event = 0;
+    demoEvents = {};
+    demoBets = [];
+    demoCounters.bet = 0;
+    console.log('🧪 Seeded demo accounts (Admin, Alice, Bob, Charlie with 100 SOL each)');
+  };
+
+  // Initialize demo state once at startup (lazy-safe)
+  if (DEMO_MODE) {
+    seedDemoState();
+  }
+
   // Solana client configuration
   const getSolanaConnection = (): Connection => {
     const network = process.env.VITE_SOLANA_NETWORK || 'solana-localnet';
@@ -139,6 +179,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 GET /api/events - Fetching all events');
     
     try {
+      if (DEMO_MODE) {
+        seedDemoState();
+        console.log('🧪 DEMO_MODE enabled - returning in-memory events');
+        const events = Object.values(demoEvents).sort((a, b) => a.eventId - b.eventId);
+        return res.json(events);
+      }
+
       const program = loadProgram();
       if (!program) {
         console.log('⚠️  Program not configured');
@@ -234,6 +281,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid event ID' });
       }
 
+      if (DEMO_MODE) {
+        seedDemoState();
+        const ev = demoEvents[eventId];
+        if (!ev) return res.status(404).json({ error: 'Event not found' });
+        return res.json(ev);
+      }
+
       const program = loadProgram();
       if (!program) {
         return res.status(500).json({ error: 'Program not configured' });
@@ -284,6 +338,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       if (!userAddress) {
         return res.status(400).json({ error: 'Invalid request' });
+      }
+
+      if (DEMO_MODE) {
+        seedDemoState();
+        const bets = demoBets.filter(b => b.bettor === userAddress);
+        return res.json(bets);
       }
 
       const program = loadProgram();
@@ -346,6 +406,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid event ID' });
       }
 
+      if (DEMO_MODE) {
+        seedDemoState();
+        const bets = demoBets.filter(b => Number(b.eventId) === eventId);
+        return res.json(bets);
+      }
+
       const program = loadProgram();
       if (!program) {
         return res.status(500).json({ error: 'Program not configured' });
@@ -390,6 +456,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 GET /api/stats');
     
     try {
+      if (DEMO_MODE) {
+        seedDemoState();
+        const eventCount = Object.keys(demoEvents).length;
+        const betCount = demoBets.length;
+  const totalVolume = demoBets.reduce((acc, b) => acc + toLamports(b.amount), BigInt(0));
+        return res.json({
+          eventCount,
+          betCount,
+          totalVolume: fromLamports(totalVolume),
+          network: 'demo',
+        });
+      }
+
       const program = loadProgram();
       if (!program) {
         return res.json({
@@ -422,13 +501,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEMO endpoints for mutations and accounts
+  // GET /api/demo/accounts - list demo accounts and balances
+  app.get("/api/demo/accounts", (req, res) => {
+    if (!DEMO_MODE) return res.status(404).json({ error: 'Not available' });
+    seedDemoState();
+    res.json(Object.values(demoAccounts));
+  });
+
+  // POST /api/events - create a new event (admin only)
+  app.post("/api/events", (req, res) => {
+    if (!DEMO_MODE) return res.status(501).json({ error: 'Not implemented' });
+    seedDemoState();
+    const { name, endTime, adminAddress } = req.body || {};
+    if (!name || typeof name !== 'string' || name.trim().length < 3) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
+    const end = Number(endTime);
+    if (!end || Number.isNaN(end)) {
+      return res.status(400).json({ error: 'Invalid endTime' });
+    }
+    if (!adminAddress) {
+      return res.status(403).json({ error: 'Admin address required' });
+    }
+
+    const eventId = ++demoCounters.event;
+    const ev: Event = {
+      eventId,
+      name: name.trim(),
+      endTime: end,
+      resolved: false,
+      outcome: false,
+      totalYesBets: 0,
+      totalNoBets: 0,
+      totalYesAmount: '0',
+      totalNoAmount: '0',
+      creator: adminAddress,
+    };
+    demoEvents[eventId] = ev;
+    console.log('🧪 Created demo event', ev);
+    return res.json(ev);
+  });
+
+  // POST /api/bets - place a bet
+  app.post("/api/bets", (req, res) => {
+    if (!DEMO_MODE) return res.status(501).json({ error: 'Not implemented' });
+    seedDemoState();
+    const { eventId, bettor, outcome, amount } = req.body || {};
+    const idNum = Number(eventId);
+    if (!idNum || Number.isNaN(idNum) || !demoEvents[idNum]) {
+      return res.status(400).json({ error: 'Invalid eventId' });
+    }
+    const ev = demoEvents[idNum];
+    if (ev.resolved) return res.status(400).json({ error: 'Event already resolved' });
+    if (!bettor || typeof bettor !== 'string') return res.status(400).json({ error: 'Invalid bettor' });
+    let acct = demoAccounts[bettor];
+    if (!acct) {
+      // Auto-create demo account with 100 SOL starting balance
+      acct = { address: bettor, name: `User-${bettor.slice(0, 4)}`, balance: (BigInt(100) * LAMPORTS_PER_SOL).toString() };
+      demoAccounts[bettor] = acct;
+      console.log('🧪 Auto-created demo account for', bettor);
+    }
+    const amt = (() => { try { return toLamports(amount); } catch { return null; } })();
+  if (amt === null || amt <= BigInt(0)) return res.status(400).json({ error: 'Invalid amount' });
+    const bal = toLamports(acct.balance);
+    if (bal < amt) return res.status(400).json({ error: 'Insufficient balance' });
+    const isYes = !!outcome;
+
+    // Deduct balance
+    acct.balance = fromLamports(bal - amt);
+
+    // Create bet
+    const betId = String(++demoCounters.bet);
+    const bet: Bet = {
+      betId,
+      eventId: String(idNum),
+      bettor,
+      outcome: isYes,
+      amount: fromLamports(amt),
+      claimed: false,
+    };
+    demoBets.push(bet);
+
+    // Update event aggregates
+    if (isYes) {
+      ev.totalYesBets += 1;
+      ev.totalYesAmount = fromLamports(toLamports(ev.totalYesAmount) + amt);
+    } else {
+      ev.totalNoBets += 1;
+      ev.totalNoAmount = fromLamports(toLamports(ev.totalNoAmount) + amt);
+    }
+
+    console.log(`🧪 Placed demo bet #${betId} on event ${idNum} by ${bettor}`);
+    return res.json({ bet, balance: acct.balance, event: ev });
+  });
+
+  // POST /api/events/:id/resolve - resolve an event (admin only)
+  app.post("/api/events/:id/resolve", (req, res) => {
+    if (!DEMO_MODE) return res.status(501).json({ error: 'Not implemented' });
+    seedDemoState();
+    const eventId = Number(req.params.id);
+    const { outcome, adminAddress } = req.body || {};
+    if (!eventId || Number.isNaN(eventId) || !demoEvents[eventId]) {
+      return res.status(400).json({ error: 'Invalid eventId' });
+    }
+    if (!adminAddress) {
+      return res.status(403).json({ error: 'Admin address required' });
+    }
+    const ev = demoEvents[eventId];
+    ev.resolved = true;
+    ev.outcome = !!outcome;
+    console.log(`🧪 Resolved demo event ${eventId} with outcome=${ev.outcome}`);
+    return res.json(ev);
+  });
+
+  // POST /api/bets/claim - claim winnings for a resolved event
+  app.post("/api/bets/claim", (req, res) => {
+    if (!DEMO_MODE) return res.status(501).json({ error: 'Not implemented' });
+    seedDemoState();
+    const { eventId, bettor } = req.body || {};
+    const idNum = Number(eventId);
+    if (!idNum || Number.isNaN(idNum) || !demoEvents[idNum]) {
+      return res.status(400).json({ error: 'Invalid eventId' });
+    }
+    const ev = demoEvents[idNum];
+    if (!ev.resolved) return res.status(400).json({ error: 'Event not resolved' });
+    const acct = demoAccounts[bettor];
+    if (!acct) return res.status(400).json({ error: 'Unknown bettor account' });
+
+    const winningPool = ev.outcome ? toLamports(ev.totalYesAmount) : toLamports(ev.totalNoAmount);
+    const losingPool = ev.outcome ? toLamports(ev.totalNoAmount) : toLamports(ev.totalYesAmount);
+    if (winningPool === BigInt(0)) {
+      return res.json({ payout: '0', claimedBetIds: [], message: 'No winning bets' });
+    }
+
+    const candidateBets = demoBets.filter(b => Number(b.eventId) === idNum && b.bettor === bettor && b.outcome === ev.outcome && !b.claimed);
+    if (candidateBets.length === 0) {
+      return res.json({ payout: '0', claimedBetIds: [] });
+    }
+
+  let totalPayout = BigInt(0);
+    const claimedIds: string[] = [];
+    for (const b of candidateBets) {
+      const principal = toLamports(b.amount);
+      // Payout = principal + pro-rata share of losing pool
+      const share = (principal * losingPool) / winningPool;
+      const payout = principal + share;
+      totalPayout += payout;
+      b.claimed = true;
+      claimedIds.push(b.betId);
+    }
+
+    // Credit account
+    acct.balance = fromLamports(toLamports(acct.balance) + totalPayout);
+    console.log(`🧪 Claimed ${fromLamports(totalPayout)} lamports for ${bettor} on event ${idNum}`);
+    return res.json({ payout: fromLamports(totalPayout), claimedBetIds: claimedIds, balance: acct.balance });
+  });
+
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: 'ok',
-      network: process.env.VITE_SOLANA_NETWORK || 'solana-localnet',
+      network: DEMO_MODE ? 'demo' : (process.env.VITE_SOLANA_NETWORK || 'solana-localnet'),
       programId: process.env.VITE_SOLANA_PROGRAM_ID || 'not configured',
       timestamp: new Date().toISOString(),
+      demo: DEMO_MODE,
+    });
+  });
+
+  // GET /api/accounts - get all demo accounts
+  app.get("/api/accounts", (req, res) => {
+    if (!DEMO_MODE) return res.status(404).json({ error: 'Demo mode disabled' });
+    seedDemoState();
+    const accounts = Object.values(demoAccounts).map(acc => ({
+      address: acc.address,
+      name: acc.name,
+      balanceSOL: Number(acc.balance) / Number(LAMPORTS_PER_SOL),
+    }));
+    return res.json(accounts);
+  });
+
+  // GET /api/accounts/:address - get specific account balance
+  app.get("/api/accounts/:address", (req, res) => {
+    if (!DEMO_MODE) return res.status(404).json({ error: 'Demo mode disabled' });
+    seedDemoState();
+    const address = req.params.address;
+    const acc = demoAccounts[address];
+    if (!acc) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    return res.json({
+      address: acc.address,
+      name: acc.name,
+      balanceSOL: Number(acc.balance) / Number(LAMPORTS_PER_SOL),
+      balanceLamports: acc.balance,
     });
   });
 

@@ -1,11 +1,12 @@
 /**
  * Prediction Market Smart Contract Configuration
- * 
+ *
  * This file contains the contract address and ABI for interacting with
  * the PredictionMarket smart contract deployed on Polygon Amoy testnet.
+ * NOTE: App has been migrated to Solana - this file is deprecated
  */
 
-import contractAbi from '@shared/PredictionMarket.json';
+// import contractAbi from '@shared/PredictionMarket.json';
 
 /**
  * Deployed contract address on Polygon Amoy testnet
@@ -21,7 +22,7 @@ export const predictionMarketAddress = "0x766e60Be7043976EFdD9bE349dd198667d247c
  * - Reading event data
  * - Claiming winnings
  */
-export const predictionMarketAbi = contractAbi;
+// export const predictionMarketAbi = contractAbi;
 
 /**
  * Admin wallet address

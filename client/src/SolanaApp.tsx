@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SolanaWalletProvider } from "@/contexts/SolanaWalletContext";
+import { DemoAccountProvider } from "@/contexts/DemoAccountContext";
 import SolanaHeader from "@/components/SolanaHeader";
 import HomePage from "@/pages/HomePage";
 import MyBetsPage from "@/pages/MyBetsPage";
@@ -27,13 +28,15 @@ export default function SolanaApp() {
   return (
     <QueryClientProvider client={queryClient}>
       <SolanaWalletProvider>
-        <TooltipProvider>
-          <div className="min-h-screen bg-background">
-            <SolanaHeader />
-            <Router />
-          </div>
-          <Toaster />
-        </TooltipProvider>
+        <DemoAccountProvider>
+          <TooltipProvider>
+            <div className="min-h-screen bg-background">
+              <SolanaHeader />
+              <Router />
+            </div>
+            <Toaster />
+          </TooltipProvider>
+        </DemoAccountProvider>
       </SolanaWalletProvider>
     </QueryClientProvider>
   );

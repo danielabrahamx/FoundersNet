@@ -9,7 +9,7 @@ export default function AdminEventsTableExample() {
       status: "CLOSED" as const,
       yesBets: 45,
       noBets: 23,
-      endTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      endTime: Math.floor((Date.now() - 2 * 60 * 60 * 1000) / 1000),
     },
     {
       id: 2,
@@ -18,7 +18,7 @@ export default function AdminEventsTableExample() {
       status: "OPEN" as const,
       yesBets: 12,
       noBets: 8,
-      endTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      endTime: Math.floor((Date.now() + 3 * 24 * 60 * 60 * 1000) / 1000),
     },
     {
       id: 3,
@@ -27,7 +27,7 @@ export default function AdminEventsTableExample() {
       status: "RESOLVED" as const,
       yesBets: 30,
       noBets: 15,
-      endTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      endTime: Math.floor((Date.now() - 5 * 24 * 60 * 60 * 1000) / 1000),
       outcome: "YES" as const,
     },
   ];

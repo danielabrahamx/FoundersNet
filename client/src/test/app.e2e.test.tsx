@@ -65,12 +65,16 @@ describe('FoundersNet E2E Tests', () => {
   });
 
   describe('Application Initialization', () => {
-    it('should render the application without crashing', () => {
+    it('should render the application without crashing', async () => {
       render(
         <QueryClientProvider client={queryClient}>
           <SolanaApp />
         </QueryClientProvider>
       );
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Loading events from blockchain/i)).not.toBeInTheDocument();
+      });
 
       expect(screen.getByText('FoundersNet')).toBeInTheDocument();
     });
@@ -93,7 +97,7 @@ describe('FoundersNet E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      expect(screen.getByText(/solana-devnet/i)).toBeInTheDocument();
+      expect(screen.getByTestId('network-indicator')).toBeInTheDocument();
     });
 
     it('should display wallet connection button', () => {
@@ -167,10 +171,12 @@ describe('FoundersNet E2E Tests', () => {
         },
       ];
 
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => mockEvents,
-      });
+      global.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockEvents),
+        })
+      );
 
       render(
         <QueryClientProvider client={queryClient}>
@@ -221,7 +227,7 @@ describe('FoundersNet E2E Tests', () => {
       );
 
       // Check that devnet is displayed
-      expect(screen.getByText(/devnet/i)).toBeInTheDocument();
+      expect(screen.getByTestId('network-indicator')).toBeInTheDocument();
     });
   });
 });

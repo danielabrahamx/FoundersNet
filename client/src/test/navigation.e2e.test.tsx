@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SolanaApp from '../SolanaApp';
 
@@ -65,12 +65,16 @@ describe('Navigation E2E Tests', () => {
   });
 
   describe('Page Navigation', () => {
-    it('should navigate to Home page by default', () => {
+    it('should navigate to Home page by default', async () => {
       render(
         <QueryClientProvider client={queryClient}>
           <SolanaApp />
         </QueryClientProvider>
       );
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Loading events from blockchain/i)).not.toBeInTheDocument();
+      });
 
       expect(screen.getByText('Startup Prediction Markets')).toBeInTheDocument();
     });
@@ -82,7 +86,7 @@ describe('Navigation E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      const myBetsLink = screen.getByTestId('link-my-bets');
+      const myBetsLink = screen.getByTestId('link-nav-my-bets');
       fireEvent.click(myBetsLink);
 
       // My Bets page should show wallet connection prompt or bets table
@@ -112,8 +116,8 @@ describe('Navigation E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      const homeLink = screen.getByTestId('link-home');
-      const myBetsLink = screen.getByTestId('link-my-bets');
+      const homeLink = screen.getByTestId('link-nav-home');
+      const myBetsLink = screen.getByTestId('link-nav-my-bets');
 
       expect(homeLink).toHaveTextContent('Home');
       expect(myBetsLink).toHaveTextContent('My Bets');
@@ -130,7 +134,7 @@ describe('Navigation E2E Tests', () => {
         </QueryClientProvider>
       );
 
-      expect(screen.getByTestId('link-my-bets')).toBeInTheDocument();
+      expect(screen.getByTestId('link-nav-my-bets')).toBeInTheDocument();
     });
   });
 });

@@ -4,7 +4,7 @@ export default function AdminEventFormExample() {
   return (
     <div className="p-4 bg-background max-w-2xl">
       <AdminEventForm
-        onSubmit={(data) => console.log('Event created:', data)}
+        onSuccess={() => console.log('Event created successfully')}
       />
     </div>
   );

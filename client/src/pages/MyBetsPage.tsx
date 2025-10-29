@@ -16,6 +16,7 @@ export default function MyBetsPage() {
   const { data: contractEvents, isLoading: eventsLoading } = useAllEvents();
   const { execute: claimWinnings, isLoading: isClaimPending } = useClaimWinnings();
   const { toast } = useToast();
+  const isDemoMode = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
 
   const isLoading = betsLoading || eventsLoading;
 
@@ -108,13 +109,33 @@ export default function MyBetsPage() {
     }
 
     try {
-      await claimWinnings(Number(bet.eventId), betId);
-      
-      toast({
-        title: "Winnings Claimed!",
-        description: "Your winnings have been transferred to your wallet.",
-      });
-      refetch(); // Refresh the bets list
+      if (isDemoMode) {
+        const resp = await fetch('/api/bets/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: Number(bet.eventId), bettor: address }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err?.error || 'Failed to claim (demo)');
+        }
+        const data = await resp.json();
+        toast({ title: 'Winnings Claimed (Demo)', description: `Payout: ${(Number(data.payout) / 1_000_000_000).toFixed(4)} SOL` });
+        // Refresh balance after claiming
+        const { useDemoAccount: importedUseDemoAccount } = await import('@/contexts/DemoAccountContext');
+        try {
+          const demoContext = importedUseDemoAccount();
+          await demoContext.refreshBalance();
+        } catch {}
+        refetch();
+      } else {
+        await claimWinnings(Number(bet.eventId), betId);
+        toast({
+          title: "Winnings Claimed!",
+          description: "Your winnings have been transferred to your wallet.",
+        });
+        refetch(); // Refresh the bets list
+      }
     } catch (error) {
       console.error('Error claiming winnings:', error);
       toast({
@@ -131,7 +152,7 @@ export default function MyBetsPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold tracking-tight mb-2">My Bets</h1>
           <p className="text-muted-foreground">
-            Please connect your wallet to view your bets
+            {isDemoMode ? 'Select a demo account from the header to view its bets.' : 'Please connect your wallet to view your bets.'}
           </p>
         </div>
       </div>
@@ -155,7 +176,9 @@ export default function MyBetsPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold tracking-tight mb-2">My Bets</h1>
           <p className="text-destructive">
-            Error loading bets. Please make sure your wallet is connected to the Solana network.
+            {isDemoMode
+              ? `Error loading bets. Please try again.`
+              : `Error loading bets. Please make sure your wallet is connected to the Solana network.`}
           </p>
         </div>
       </div>
