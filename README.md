@@ -6,61 +6,19 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-** Status:** Production Ready  
-** Smart Contract:** Solana (Rust / Anchor)
+**🎥 DEMO VIDEO:** [Watch Demo](#)  
+**💻 CODE OVERVIEW VIDEO:** [Watch Overview](#)
 
 ---
-## DEMO VIDEO : 
-## CODE OVERVIEW VIDEO 
-##  What It Does
+
+## 🎯 What It Does
 
 A trustless prediction market where users bet SOL on startup funding outcomes:
 
--  **Trustless:** Smart contracts enforce fair outcomes
--  **Transparent:** All bets visible on-chain
--  **Instant Payouts:** Automated winnings distribution
--  **Low Fees:** Solana's low transaction fees
-
----
-
-## Technical Implementation & Solana Integration
-
-### SDKs and Tools Used
-- **@solana/web3.js**: Frontend blockchain interactions
-- **Anchor Framework**: Smart contract development and client generation
-- **@solana/wallet-adapter-react**: Secure transaction signing with wallet support
-- **Rust**: For smart contract development
-
-### Key Solana Features Leveraged
-
-#### 1. Program Derived Addresses (PDAs) for Scalability
-FoundersNet uses PDAs to:
-- Store unlimited betting events without state constraints
-- Maintain detailed bet history for each user
-- Scale to thousands of concurrent prediction markets
-
-#### 2. Anchor Framework
-- Type-safe smart contract method calls via an IDL
-- Standardized interface for frontend integration
-- Robust error handling and validation
-
-#### 3. Atomic Transactions
-- Guaranteed consistency between SOL transfers and bet recording
-- Prevents partial execution failures
-- Enables complex multi-step operations
-
-#### 4. High-Speed Finality
-- Bets are confirmed in sub-seconds
-- No waiting for multiple block confirmations
-- Superior user experience compared to other blockchains
-
-### What Makes This Uniquely Possible on Solana
-
-1. **Cost Efficiency**: Ethereum gas fees would make micro-betting economically unviable. Solana's low fees are perfect for this use case.
-2. **Scalability**: Solana's architecture allows for massive scalability, handling thousands of transactions per second.
-3. **Developer Experience**: The Anchor framework and Rust provide a robust environment for secure smart contract development.
-4. **Network Performance**: Sub-second finality enables real-time betting experiences.
-
+- 🔐 **Trustless:** Smart contracts enforce fair outcomes
+- 🔍 **Transparent:** All bets visible on-chain
+- ⚡ **Instant Payouts:** Automated winnings distribution
+- 💰 **Low Fees:** Solana's low transaction fees
 
 ---
 
@@ -76,175 +34,275 @@ FoundersNet uses PDAs to:
 
 ---
 
-##  Quick Start
+## 🚀 Quick Start (3 Steps)
 
-**For Judges/Testing:** See [DEVNET_DEPLOYMENT_GUIDE.md](./DEVNET_DEPLOYMENT_GUIDE.md) for complete step-by-step instructions to deploy and test on Solana Devnet.
-
-### Verify Everything Works Locally
+### 1️⃣ Install Dependencies
 ```bash
-# 1. Install dependencies
 npm install
+```
 
-# 2. Run all tests (272 tests)
+### 2️⃣ Run Tests (Verify Everything Works)
+```bash
 npm run test:unit
 # Expected: 272 tests passing | 21 skipped | 0 failures
+```
 
-# 3. Build production frontend
-npm run build:frontend
-# Expected: ✓ built in ~33s
-
-# 4. Start development server (optional)
+### 3️⃣ Start Development Server
+```bash
 npm run dev
 # Frontend: http://localhost:5173
+# Backend: http://localhost:5000
 ```
 
-### Deploy to Devnet
+---
+
+## 🌐 Deployment Instructions
+
+### Prerequisites
+- Node.js 18+
+- Solana CLI 1.18.18+
+- Anchor Framework 0.30.1+
+- A Solana wallet (Phantom recommended)
+
+### Deploy to Solana Devnet
+
+**Step 1: Configure Environment**
 ```bash
-# Follow the complete guide at: DEVNET_DEPLOYMENT_GUIDE.md
+# Create .env file
+cp .env.example .env
+
+# Set your RPC URL (or use default Devnet)
+VITE_SOLANA_NETWORK=devnet
+VITE_SOLANA_RPC_URL=https://api.devnet.solana.com
+```
+
+**Step 2: Build Smart Contract**
+```bash
+cd smart_contracts/solana
+anchor build
+```
+
+**Step 3: Deploy Contract**
+```bash
+anchor deploy --provider.cluster devnet
+```
+
+**Step 4: Update Program ID**
+```bash
+# Copy the deployed program ID and update:
+# - Anchor.toml: [programs.devnet]
+# - shared/contracts.ts: SOLANA_PROGRAM_ID
+```
+
+**Step 5: Initialize Program**
+```bash
+# Run initialization script with your admin wallet
+node scripts/deploy-solana-devnet.js
+```
+
+**Step 6: Build & Deploy Frontend**
+```bash
+npm run build:frontend
+# Deploy dist/ folder to your hosting provider (Vercel, Netlify, etc.)
+```
+
+### Deploy to Solana Localnet (Testing)
+
+```bash
+# Start local validator
+solana-test-validator
+
+# In another terminal:
+cd smart_contracts/solana
+anchor build
+anchor deploy --provider.cluster localnet
+
+# Initialize and test
+npm run dev
 ```
 
 ---
 
-##  Architecture
+## 🏗️ Architecture
 
 ```
-
-   React App       User Interface (TypeScript + Vite)
-
-         
-          Solana Wallet (Phantom, Solflare, etc.) (Sign Transactions)
-         
-          Express.js Backend (Port 5000)
-             PostgreSQL + Drizzle ORM
-         
-          Solana Local Validator (Port 8899)
-              Smart Contract (Anchor Program)
-                  Program Accounts (Events, Bets, User Data)
+┌─────────────────┐
+│   React App     │  User Interface (TypeScript + Vite)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Solana Wallet   │  (Sign Transactions)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Express Backend │  (Port 5000 - API Layer)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Solana Program  │  Smart Contract (Anchor/Rust)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Solana Network  │  Devnet/Mainnet
+└─────────────────┘
 ```
 
 ---
 
-##  Tech Stack
+## 🛠️ Tech Stack
 
 **Frontend:**
 - React 18 + TypeScript
 - Vite build tool
-- TailwindCSS + shadcn/ui components
-- @solana/wallet-adapter-react for wallet integration
+- TailwindCSS + shadcn/ui
+- @solana/wallet-adapter-react
 - @solana/web3.js
 
 **Backend:**
 - Express.js REST API
-- PostgreSQL database
-- Drizzle ORM
-- @solana/web3.js for blockchain queries
+- @solana/web3.js
 
 **Smart Contract:**
 - Rust
-- Anchor Framework
-- Deployed on Solana
+- Anchor Framework (v0.30.1)
+- Solana Program (9 instructions)
 
 ---
 
-##  How to Use
+## 📁 Project Structure
 
-### **As a User:**
-1. Connect your Solana Wallet (e.g., Phantom)
+```
+FoundersNet/
+├── client/src/              # React frontend
+│   ├── components/          # UI components
+│   ├── hooks/               # Custom hooks (blockchain interactions)
+│   ├── services/            # Solana service layer
+│   ├── pages/               # App pages (Home, Admin, MyBets)
+│   └── contexts/            # React contexts (Wallet)
+├── server/                  # Express.js backend
+│   ├── index.ts            # Server entry point
+│   └── routes-solana.ts    # API endpoints
+├── smart_contracts/solana/  # Solana program
+│   └── programs/prediction_market/
+│       └── src/lib.rs      # Smart contract (508 lines)
+├── scripts/                 # Deployment scripts
+├── test/                    # Test suites (272 tests)
+└── docs/                    # Documentation
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm run test:unit
+
+# Type checking
+npm run check
+
+# Lint code
+npm run lint
+
+# Build production
+npm run build:frontend
+```
+
+**Test Coverage:**
+- ✅ 272 unit tests passing
+- ✅ E2E workflow validation
+- ✅ Smart contract instructions tested
+- ✅ Frontend component tests
+
+---
+
+## 🎮 How to Use
+
+### As a User:
+1. Connect your Solana wallet (Phantom, Solflare, etc.)
 2. Browse active prediction events
 3. Place YES/NO bets with SOL
 4. Wait for admin to resolve event
 5. Claim proportional winnings if you won!
 
-### **As an Admin:**
-1. Connect with the admin account
-2. Create new prediction events
+### As an Admin:
+1. Connect with the admin wallet
+2. Create new prediction events (name, emoji, end time)
 3. Resolve events when outcome is known
 4. Platform automatically distributes winnings
 
 ---
 
-##  Testing on LocalNet
+## 🔧 Development Commands
 
-We provide funded test accounts in the local validator. You can airdrop SOL to any address for testing.
-
----
-
-##  Project Structure
-
-```
-StartupMarkets/
- client/src/              # React frontend
-    components/          # UI components
-    hooks/               # Custom React hooks
-    services/            # Solana services
-    pages/               # App pages
- server/                  # Express.js backend
- smart_contracts/solana/  # Solana Rust contracts
- scripts/                 # Deployment scripts
- docs/                    # Documentation
-```
-
----
-
-##  Deployment
-
-### LocalNet (Development)
 ```bash
-npm run compile:solana && npm run deploy:solana:localnet
-```
+# Development
+npm run dev                    # Start dev servers
+npm run dev:frontend          # Frontend only (port 5173)
+npm run dev:backend           # Backend only (port 5000)
 
-### DevNet (Staging)
-```bash
-npm run compile:solana && npm run deploy:solana:devnet
-```
+# Building
+npm run build                 # Build everything
+npm run build:frontend        # Build frontend only
 
-### Verify Deployment
-```bash
-npm run deploy:verify:devnet
+# Testing
+npm run test:unit             # Run all tests
+npm run test:unit:watch       # Watch mode
+npm run check                 # Type checking
+
+# Solana
+npm run compile:solana        # Build smart contract
+anchor test                   # Test smart contract
 ```
 
 ---
 
-## ✅ Phase 7: Hackathon Ready
+## 📚 Technical Deep Dive
 
-**Status**: 🎯 PRODUCTION READY
+### Solana Integration Highlights
 
-- ✅ Smart Contract: 9 instructions, 508 lines Rust
-- ✅ Tests: 272+ passing tests
-- ✅ E2E: Complete workflow validated
-- ✅ Deployment: Ready for devnet
-- ✅ Documentation: Comprehensive guides
+**1. Program Derived Addresses (PDAs)**
+- Deterministic account addresses for events and bets
+- Scalable to unlimited prediction markets
+- No state size constraints
 
-**Run Tests**:
-```bash
-npm run test:unit        # 272 tests pass
-npm run build:frontend   # Production build
-```
+**2. Atomic Transactions**
+- SOL transfers and bet recording in single transaction
+- Guaranteed consistency
+- No partial execution failures
 
-**Submission Documents**:
-- [PHASE_7_SUBMISSION.md](./PHASE_7_SUBMISSION.md) - Hackathon submission package
-- [PHASE_7_COMPLETE.md](./PHASE_7_COMPLETE.md) - Full deployment guide
-- [PHASE_2_COMPLETE.md](./PHASE_2_COMPLETE.md) - Smart contract details
-- [phases.md](./phases.md) - Complete migration history
+**3. High-Speed Finality**
+- Sub-second confirmation times
+- Real-time betting experience
+- No waiting for multiple blocks
+
+**4. Low Transaction Costs**
+- ~$0.00025 per transaction
+- Makes micro-betting economically viable
+- Superior to high-fee chains
 
 ---
 
-##  Learn More
+## 📖 Documentation
 
-- **[PHASE_7_SUBMISSION.md](./PHASE_7_SUBMISSION.md)** - Hackathon submission package (START HERE)
+- **[AGENTS.md](./AGENTS.md)** - Coding guidelines for contributors
 - **[START-HERE.md](./START-HERE.md)** - Complete setup guide
-- **[phases.md](./phases.md)** - Development history & migration notes
-- **[docs/architecture/](./docs/architecture/)** - System architecture details
+- **[DEVNET_DEPLOYMENT_GUIDE.md](./DEVNET_DEPLOYMENT_GUIDE.md)** - Detailed deployment steps
+- **[TEST_DOCUMENTATION.md](./TEST_DOCUMENTATION.md)** - Testing guide
 
 ---
 
-##  Contributing
+## 🤝 Contributing
 
-Contributions welcome! 
+Contributions welcome! Please read [AGENTS.md](./AGENTS.md) for coding guidelines.
 
 ---
 
-##  License
+## 📄 License
 
 MIT License - see [LICENSE](./LICENSE) for details
 

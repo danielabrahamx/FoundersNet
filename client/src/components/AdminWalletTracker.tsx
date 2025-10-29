@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, TrendingUp, TrendingDown, Loader2, Activity } from "lucide-react";
 import { useMemo } from "react";
 
-// Helper to format microAlgos to ALGO
-const formatAlgo = (microAlgos: bigint): string => {
-  return (Number(microAlgos) / 1_000_000).toFixed(2);
+// Helper to format lamports to SOL
+const formatSol = (lamports: bigint): string => {
+  return (Number(lamports) / 1_000_000_000).toFixed(2);
 };
 
 interface AdminEvent {
@@ -33,7 +33,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
       const event = events.find(e => e.id === eventId);
       if (!event) return { yesBets: 0, noBets: 0, totalBets: 0, totalAmount: "0" };
       
-      const totalAmount = formatAlgo(event.totalYesAmount + event.totalNoAmount);
+      const totalAmount = formatSol(event.totalYesAmount + event.totalNoAmount);
       return {
         yesBets: event.yesBets,
         noBets: event.noBets,
@@ -45,15 +45,15 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
     // Aggregate all events
     const totalYesBets = events.reduce((acc, e) => acc + e.yesBets, 0);
     const totalNoBets = events.reduce((acc, e) => acc + e.noBets, 0);
-    const totalAmount = events.reduce((acc, e) => {
-      return acc + Number(formatAlgo(e.totalYesAmount + e.totalNoAmount));
-    }, 0);
+    const totalAmountBigInt = events.reduce((acc, e) => {
+      return acc + e.totalYesAmount + e.totalNoAmount;
+    }, BigInt(0));
 
     return {
       yesBets: totalYesBets,
       noBets: totalNoBets,
       totalBets: totalYesBets + totalNoBets,
-      totalAmount: totalAmount.toFixed(2),
+      totalAmount: formatSol(totalAmountBigInt),
     };
   }, [events, eventId]);
 
@@ -80,7 +80,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
               </div>
               <div className="p-4 rounded-md bg-primary/10 border">
                 <div className="text-2xl font-bold font-mono">{stats.totalAmount}</div>
-                <div className="text-sm text-muted-foreground">ALGO Wagered</div>
+                <div className="text-sm text-muted-foreground">SOL Wagered</div>
               </div>
               <div className="p-4 rounded-md bg-bet-yes/10 border">
                 <div className="text-2xl font-bold text-bet-yes">{stats.yesBets}</div>
@@ -102,7 +102,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
                     </div>
                   ) : (
                     events.map((event) => {
-                      const eventTotal = formatAlgo(event.totalYesAmount + event.totalNoAmount);
+                      const eventTotal = formatSol(event.totalYesAmount + event.totalNoAmount);
                       const totalBets = event.yesBets + event.noBets;
                       
                       return (
@@ -128,7 +128,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
                             </div>
                             <Badge variant="outline">{totalBets} bets</Badge>
                             <div className="text-sm font-mono text-muted-foreground min-w-[80px] text-right">
-                              {eventTotal} ALGO
+                              {eventTotal} SOL
                             </div>
                           </div>
                         </div>
@@ -186,7 +186,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
             </div>
             <div className="p-3 rounded-md bg-primary/10 border">
               <div className="text-2xl font-bold font-mono">{stats.totalAmount}</div>
-              <div className="text-sm text-muted-foreground">ALGO Pool</div>
+              <div className="text-sm text-muted-foreground">SOL Pool</div>
             </div>
           </div>
 
@@ -196,7 +196,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-bet-yes font-medium">YES Bets</span>
-                  <span className="font-mono">{formatAlgo(event.totalYesAmount)} ALGO</span>
+                  <span className="font-mono">{formatSol(event.totalYesAmount)} SOL</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div 
@@ -212,7 +212,7 @@ export default function AdminWalletTracker({ events, eventId }: AdminWalletTrack
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-bet-no font-medium">NO Bets</span>
-                  <span className="font-mono">{formatAlgo(event.totalNoAmount)} ALGO</span>
+                  <span className="font-mono">{formatSol(event.totalNoAmount)} SOL</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div 
