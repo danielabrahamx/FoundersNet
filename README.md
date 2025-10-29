@@ -6,8 +6,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**🎥 DEMO VIDEO:** 
-**💻 CODE OVERVIEW VIDEO:** 
+**🎥 DEMO VIDEO:** https://youtu.be/1JXoABdrP04
+**💻 CODE OVERVIEW VIDEO:** https://youtu.be/SGxryo_z_sw
 
 ---
 
