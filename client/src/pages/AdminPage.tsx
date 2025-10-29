@@ -43,8 +43,11 @@ export default function AdminPage() {
   const { toast } = useToast();
   const { data: contractEvents, isLoading, error } = useAllEvents();
 
+  // Demo mode - bypass blockchain requirements
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
   // Check if connected wallet is admin
-  const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+  const isAdmin = isDemoMode ? true : address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
 
   // Transform contract events to admin events format
   const adminEvents = useMemo(() => {
@@ -94,6 +97,25 @@ export default function AdminPage() {
   }, [adminEvents]);
 
   const handleResolve = async (eventId: number, outcome: "YES" | "NO") => {
+    if (isDemoMode) {
+      try {
+        const resp = await fetch(`/api/events/${eventId}/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outcome: outcome === 'YES', adminAddress: ADMIN_ADDRESS || address }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err?.error || 'Failed to resolve event (demo)');
+        }
+        toast({ title: 'Event Resolved (Demo)', description: `Event ${eventId} -> ${outcome}` });
+        setTimeout(() => window.location.reload(), 800);
+        return;
+      } catch (e) {
+        toast({ title: 'Resolution Failed', description: e instanceof Error ? e.message : 'Failed to resolve event', variant: 'destructive' });
+        return;
+      }
+    }
     console.log('🎯 AdminPage.handleResolve called:', {
       eventId,
       outcome,
@@ -148,6 +170,10 @@ export default function AdminPage() {
   };
 
   const handleInitializeProgram = async () => {
+    if (isDemoMode) {
+      toast({ title: "Demo: Program Initialized", description: "Demo mode active; no chain call made." });
+      return;
+    }
     if (!address) {
       toast({
         title: "Wallet Not Connected",
@@ -167,7 +193,7 @@ export default function AdminPage() {
   };
 
   // Show loading state while checking initialization
-  if (isCheckingInit) {
+  if (isCheckingInit && !isDemoMode) {
     return (
       <div className="container mx-auto py-8 space-y-6">
         <div className="flex items-center justify-center py-12">
@@ -179,7 +205,7 @@ export default function AdminPage() {
   }
 
   // Show initialization prompt if program not initialized
-  if (isInitialized === false) {
+  if (isInitialized === false && !isDemoMode) {
     return (
       <div className="container mx-auto py-8 space-y-6">
         <div className="flex items-center justify-between">
@@ -327,7 +353,7 @@ export default function AdminPage() {
         </Card>
         <Card className="p-4">
           <div className="text-2xl font-bold tabular-nums font-mono" data-testid="text-total-pool">{stats.totalPool}</div>
-          <div className="text-sm text-muted-foreground">ALGO Pooled</div>
+          <div className="text-sm text-muted-foreground">SOL Pooled</div>
         </Card>
       </div>
 

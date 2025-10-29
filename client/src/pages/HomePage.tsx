@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import EventCard from "@/components/EventCard";
 import BetModal from "@/components/BetModal";
-import MockModeBanner from "@/components/MockModeBanner";
 import { Button } from "@/components/ui/button";
 import { Filter, Loader2 } from "lucide-react";
 import { useAllEvents } from "@/hooks/useEvents";

@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateEvent } from "@/hooks/useSolanaPredictionMarket";
+import { useCreateEvent, useWalletAddress } from "@/hooks/useSolanaPredictionMarket";
 
 interface AdminEventFormProps {
   onSuccess?: () => void;
@@ -21,6 +21,9 @@ export default function AdminEventForm({ onSuccess }: AdminEventFormProps) {
   
   const { execute: createEvent, isLoading } = useCreateEvent();
   const { toast } = useToast();
+  const isDemoMode = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
+  const ADMIN_ADDRESS = (import.meta as any).env?.VITE_SOLANA_ADMIN_ADDRESS || '';
+  const walletAddress = useWalletAddress();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,15 +46,24 @@ export default function AdminEventForm({ onSuccess }: AdminEventFormProps) {
       // Create event name with emoji
       const eventName = `${formData.emoji} ${formData.name}`;
       
-      const signature = await createEvent(eventName, endTimeUnix);
-      
-      if (signature) {
-        // Reset form
+      if (isDemoMode) {
+        const resp = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: eventName, endTime: endTimeUnix, adminAddress: ADMIN_ADDRESS || walletAddress }),
+        });
+        if (!resp.ok) throw new Error('Failed to create event (demo)');
+        const ev = await resp.json();
+        toast({ title: 'Event Created (Demo)', description: `#${ev.eventId}: ${ev.name}` });
         setFormData({ name: "", description: "", emoji: "🚀", endTime: "" });
-        
-        // Call success callback
-        if (onSuccess) {
-          onSuccess();
+        if (onSuccess) onSuccess();
+        return;
+      } else {
+        const signature = await createEvent(eventName, endTimeUnix);
+        if (signature) {
+          // Reset form
+          setFormData({ name: "", description: "", emoji: "🚀", endTime: "" });
+          if (onSuccess) onSuccess();
         }
       }
     } catch (error) {

@@ -12,6 +12,7 @@ import { Program, AnchorProvider, BN, web3 } from '@coral-xyz/anchor';
 import { getSolanaService } from '@/services/solana.service';
 import type { PredictionMarket } from '../../../target/types/prediction_market';
 import { useToast } from './use-toast';
+import { useDemoAccount } from '@/contexts/DemoAccountContext';
 
 // ============================================================================
 // Type Definitions
@@ -66,6 +67,12 @@ interface TransactionHookReturn {
  */
 export function useWalletAddress(): string | null {
   const { publicKey } = useWallet();
+  const demoCtx = useDemoAccount();
+  const isDemoMode = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
+  // In demo mode, return the selected demo account address
+  if (isDemoMode) {
+    return demoCtx.currentAccount.address;
+  }
   return publicKey?.toBase58() || null;
 }
 
@@ -421,6 +428,8 @@ export function useCreateEvent(): TransactionHookReturn {
 export function usePlaceBet(): TransactionHookReturn {
   const { program, provider } = useSolanaProgram();
   const { publicKey } = useWallet();
+  const demo = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
+  const demoAccount = useDemoAccount();
   const { toast } = useToast();
   const service = getSolanaService();
   
@@ -433,6 +442,43 @@ export function usePlaceBet(): TransactionHookReturn {
     outcome: boolean, // true = YES, false = NO
     amount: number // Amount in SOL
   ): Promise<string | null> => {
+    // Demo mode: call backend API instead of on-chain transaction
+    if (demo) {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const lamports = Math.round(amount * LAMPORTS_PER_SOL);
+        const resp = await fetch('/api/bets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId,
+            bettor: demoAccount.currentAccount.address,
+            outcome,
+            amount: lamports,
+          }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err?.error || 'Failed to place bet (demo)');
+        }
+        const data = await resp.json();
+        toast({ title: 'Bet Placed (Demo)', description: `${amount} SOL on ${outcome ? 'YES' : 'NO'}` });
+        // Refresh balance after placing bet
+        await demoAccount.refreshBalance();
+        // Return a pseudo signature
+        setSignature(`demo-bet-${Date.now()}`);
+        return 'demo';
+      } catch (err: any) {
+        const error = err instanceof Error ? err : new Error('Failed to place bet (demo)');
+        setError(error);
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     if (!program || !provider || !publicKey) {
       const err = new Error('Wallet not connected or program not initialized');
       setError(err);
@@ -754,6 +800,8 @@ export function useGetUserBets(userAddress?: string | PublicKey | null): {
 } {
   const { program } = useSolanaProgram();
   const { publicKey } = useWallet();
+  const demo = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
+  const demoAcc = useDemoAccount();
   const [bets, setBets] = useState<SolanaBet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -762,10 +810,40 @@ export function useGetUserBets(userAddress?: string | PublicKey | null): {
     if (userAddress) {
       return typeof userAddress === 'string' ? new PublicKey(userAddress) : userAddress;
     }
+    // In demo mode, prefer the demo account address
+    if (demo) {
+      try {
+        return new PublicKey(demoAcc.currentAccount.address);
+      } catch {}
+    }
     return publicKey;
-  }, [userAddress, publicKey]);
+  }, [userAddress, publicKey, demo, demoAcc.currentAccount.address]);
 
   const fetchBets = useCallback(async () => {
+    // Demo: fetch from API
+    if (demo) {
+      const addr = demoAcc.currentAccount.address;
+      try {
+        setIsLoading(true);
+        setError(null);
+        const resp = await fetch(`/api/users/${addr}/bets`, { headers: { 'Cache-Control': 'no-cache' } });
+        if (resp.status === 304) {
+          // Not modified: keep current bets, do not treat as error
+          return;
+        }
+        if (!resp.ok) throw new Error('Failed to fetch user bets (demo)');
+        const data = await resp.json();
+        // Store as-is; MyBetsPage handles formatting
+        setBets(data as any);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to fetch user bets (demo)'));
+        setBets([] as any);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     if (!program || !targetAddress) {
       setBets([]);
       return;
@@ -794,7 +872,7 @@ export function useGetUserBets(userAddress?: string | PublicKey | null): {
     } finally {
       setIsLoading(false);
     }
-  }, [program, targetAddress]);
+  }, [program, targetAddress, demo, demoAcc.currentAccount.address]);
 
   useEffect(() => {
     fetchBets();

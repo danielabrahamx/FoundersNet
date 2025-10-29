@@ -27,6 +27,7 @@ export default function BetModal({
   const { execute: placeBet, isLoading, error } = usePlaceBet();
   const walletAddress = useWalletAddress();
   const { toast } = useToast();
+  const isDemoMode = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
 
   const totalBets = yesBets + noBets;
   const potentialReturn = choice 
@@ -36,6 +37,39 @@ export default function BetModal({
     : "0";
 
   const handleConfirm = async () => {
+    // Demo mode: call demo backend instead of blockchain
+    if (isDemoMode) {
+      if (!choice) return;
+      if (!walletAddress) {
+        toast({
+          title: 'Wallet Not Connected',
+          description: 'Please connect your wallet to place a bet.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      try {
+        const outcome = choice === 'YES';
+        const amountLamports = String(10 * 1_000_000_000); // 10 SOL
+        const resp = await fetch('/api/bets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId, bettor: walletAddress, outcome, amount: amountLamports }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err?.error || 'Failed to place bet (demo)');
+        }
+        toast({ title: 'Bet Placed (Demo)', description: `${choice} bet of 10 SOL on event #${eventId}` });
+        setChoice(null);
+        onClose();
+        return;
+      } catch (err) {
+        console.error('Demo bet failed:', err);
+        toast({ title: 'Bet Failed', description: err instanceof Error ? err.message : 'Failed to place bet', variant: 'destructive' });
+        return;
+      }
+    }
     if (!choice || !walletAddress) {
       toast({
         title: "Wallet Not Connected",
@@ -172,7 +206,7 @@ export default function BetModal({
               disabled={!choice || isLoading}
               data-testid="button-confirm-bet"
             >
-              {isLoading ? "Confirming..." : "Confirm Bet"}
+              {isDemoMode ? (isLoading ? "Confirming..." : "Confirm Bet (Demo)") : (isLoading ? "Confirming..." : "Confirm Bet")}
             </Button>
           </div>
         </div>

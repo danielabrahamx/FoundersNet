@@ -1,0 +1,35 @@
+﻿{
+    "description":  "Four accounts for startup prediction market simulation",
+    "airdropSOL":  100,
+    "network":  "localnet",
+    "accounts":  [
+                     {
+                         "keyfile":  "keys/localnet/admin.json",
+                         "balanceSOL":  100,
+                         "name":  "admin",
+                         "address":  "3Nv4rUUkigbtqYJomNvRSKiBRLUMPaxdqWdvFU2777uT",
+                         "role":  "Admin - can create events and manage betting"
+                     },
+                     {
+                         "keyfile":  "keys/localnet/alice.json",
+                         "balanceSOL":  100,
+                         "name":  "alice",
+                         "address":  "HJo4gHiC3pMShSM5HYTwynb31FXMe2ocTVzUDX9kpHv7",
+                         "role":  "Bettor - simulates betting with Alice account"
+                     },
+                     {
+                         "keyfile":  "keys/localnet/bob.json",
+                         "balanceSOL":  100,
+                         "name":  "bob",
+                         "address":  "DfzBqu6oYMng4qqR9CjJwQmMFXyTdhzVyFNsYrvLEr5b",
+                         "role":  "Bettor - simulates betting with Bob account"
+                     },
+                     {
+                         "keyfile":  "keys/localnet/charlie.json",
+                         "balanceSOL":  100,
+                         "name":  "charlie",
+                         "address":  "FBEqV7ytYEfrW8FQdpfNGLVD5DGEZVzm2maq1A5aDrdU",
+                         "role":  "Bettor - simulates betting with Charlie account"
+                     }
+                 ]
+}

@@ -15,39 +15,16 @@ import { useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import ThemeToggle from "./ThemeToggle";
-import { TrendingUp, Coins } from "lucide-react";
+import AccountSelector from "./AccountSelector";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useAccountBalance } from "@/hooks/useSolanaPredictionMarket";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useDemoAccount } from "@/contexts/DemoAccountContext";
 
 // Admin address from environment
 const ADMIN_ADDRESS = import.meta.env.VITE_SOLANA_ADMIN_ADDRESS || "";
 const NETWORK = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
-
-// Wallet info component with balance
-function WalletInfo({ address, isAdmin }: { address: string; isAdmin: boolean }) {
-  const { balance } = useAccountBalance(address);
-  
-  return (
-    <div className="hidden sm:flex items-center gap-3 px-3 py-2 rounded-md bg-accent">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{address.slice(0, 6)}...{address.slice(-4)}</span>
-        {isAdmin && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
-            Admin
-          </span>
-        )}
-      </div>
-      {balance !== null && (
-        <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground border-l pl-3">
-          <Coins className="w-3 h-3" />
-          <span>{balance.toFixed(4)} SOL</span>
-        </div>
-      )}
-    </div>
-  );
-}
+const DEMO_MODE = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
 
 // Network indicator component
 function NetworkIndicator({ network }: { network: string }) {
@@ -83,12 +60,14 @@ function NetworkIndicator({ network }: { network: string }) {
 export default function SolanaHeader() {
   const [location] = useLocation();
   const { publicKey, connected } = useWallet();
+  const { currentAccount, isAdmin } = useDemoAccount();
   const { toast } = useToast();
 
   const activeAddress = publicKey?.toBase58() || null;
-  const isAdmin = activeAddress?.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+  const isDemoAdmin = currentAccount.role === 'admin';
 
   useEffect(() => {
+    if (DEMO_MODE) return; // In demo mode, wallet is optional; skip toast
     // Show connection status
     if (connected && activeAddress) {
       toast({
@@ -101,14 +80,15 @@ export default function SolanaHeader() {
   const navItems = [
     { path: "/", label: "Home" },
     { path: "/my-bets", label: "My Bets" },
-    ...(isAdmin ? [{ path: "/admin", label: "Admin" }] : []),
+    ...(isDemoAdmin ? [{ path: "/admin", label: "Admin" }] : []),
   ];
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Top Row: Logo, Nav, and Controls */}
         <div className="flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-8 flex-1">
             <Link href="/" className="flex items-center gap-2 hover-elevate px-2 py-1 rounded-md" data-testid="link-home">
               <TrendingUp className="w-6 h-6 text-primary" />
               <span className="font-bold text-lg hidden sm:inline">FoundersNet</span>
@@ -132,24 +112,17 @@ export default function SolanaHeader() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Right Controls: Theme, Network, Account, Wallet */}
+          <div className="flex items-center gap-3">
             <ThemeToggle />
-            
-            {/* Network Indicator */}
             <NetworkIndicator network={NETWORK} />
+            <AccountSelector />
             
-            {/* Wallet Connection */}
-            {activeAddress ? (
-              <div className="flex items-center gap-2">
-                <WalletInfo address={activeAddress} isAdmin={isAdmin} />
-                <WalletMultiButton />
-              </div>
-            ) : (
-              <WalletMultiButton />
-            )}
+            {!DEMO_MODE && <WalletMultiButton />}
           </div>
         </div>
 
+        {/* Mobile Navigation */}
         <nav className="md:hidden flex items-center gap-1 pb-3 overflow-x-auto">
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
