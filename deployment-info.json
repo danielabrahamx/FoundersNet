@@ -1,8 +1,0 @@
-{
-  "network": "Polygon Amoy",
-  "chainId": 80002,
-  "contractAddress": "0x766e60Be7043976EFdD9bE349dd198667d247c76",
-  "adminAddress": "0x3c0973dc78549E824E49e41CBBAEe73502c5fC91",
-  "deployedAt": "2025-10-15T09:12:25.085Z",
-  "explorer": "https://amoy.polygonscan.com/address/0x766e60Be7043976EFdD9bE349dd198667d247c76"
-}

@@ -1,7 +1,0 @@
-# Ignore local deployment info (contains sensitive data)
-local.json
-
-# Keep testnet/mainnet deployment info for team reference
-!testnet.json
-!mainnet.json
-!*.example.json
