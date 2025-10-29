@@ -6,8 +6,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**🎥 DEMO VIDEO:** [Watch Demo](#)  
-**💻 CODE OVERVIEW VIDEO:** [Watch Overview](#)
+**🎥 DEMO VIDEO:** 
+**💻 CODE OVERVIEW VIDEO:** 
 
 ---
 
@@ -22,17 +22,6 @@ A trustless prediction market where users bet SOL on startup funding outcomes:
 
 ---
 
-## 📸 Screenshots
-
-### Events Dashboard
-![Events Dashboard](docs/screenshots/Homedashboard.png)
-*Browse active prediction markets and see real-time betting statistics*
-
-### Admin Dashboard
-![Admin Dashboard](docs/screenshots/AdminDashboard.png)
-*Manage events, resolve outcomes, and monitor platform activity*
-
----
 
 ## 🚀 Quick Start (3 Steps)
 
@@ -50,7 +39,7 @@ npm run test:unit
 ### 3️⃣ Start Development Server
 ```bash
 npm run dev
-# Frontend: http://localhost:5173
+# Frontend: http://localhost:8000
 # Backend: http://localhost:5000
 ```
 
